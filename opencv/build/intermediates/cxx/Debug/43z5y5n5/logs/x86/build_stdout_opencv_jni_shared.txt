@@ -1,0 +1,2 @@
+ninja: Entering directory `C:\Users\jzhan66\AndroidStudioProjects\MeasureSizeByOpenCV\opencv\.cxx\Debug\43z5y5n5\x86'
+ninja: no work to do.
