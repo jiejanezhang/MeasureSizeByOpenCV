@@ -1,27 +1,30 @@
 package com.example.measuresizebyopencv
 
+import android.R.attr.src
 import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.View
-import android.widget.ImageView
-import android.widget.SeekBar
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
-import org.opencv.core.Core
 import org.opencv.core.Mat
-import org.opencv.core.Scalar
-import org.opencv.imgproc.Imgproc
+import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc.*
+
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var imageView: ImageView
     private lateinit var seekbarThresholdMin: SeekBar
     private lateinit var switchFilter: SwitchCompat
+    private lateinit var radioGroup: RadioGroup
 
     private var imageBitmap: Bitmap? = null
 
@@ -32,7 +35,7 @@ class MainActivity : AppCompatActivity() {
         imageView = findViewById(R.id.imageView)
         seekbarThresholdMin = findViewById(R.id.seekbarThresholdMin)
         switchFilter = findViewById(R.id.switchFilter)
-
+        radioGroup = findViewById(R.id.radioGroup)
         // Initialize OpenCV
         OpenCVLoader.initDebug()
 
@@ -54,27 +57,26 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        seekbarThresholdMin.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+
+        // on below line we are initializing our variables.
+
+        // Add listener for our radio group.
+        radioGroup.setOnCheckedChangeListener(object: RadioGroup.OnCheckedChangeListener{
+
+            override fun onCheckedChanged(group: RadioGroup?, checkedId: Int) {
                 updateImage()
             }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                // empty
-            }
-
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                // empty
-            }
-        })
+        }
+        )
     }
 
     private fun updateImage() {
-        // Calculate brightness based on SeekBar progress
-        val brightness = mapSeekBarProgressToValue(seekbarThresholdMin.progress, -100.0, 0.0)
+        // Calculate low threshold based on SeekBar progress
+        val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin.progress, 0.0, 100.0)
 
-        // Apply brightness to the image
-        processImage(brightness, switchFilter.isChecked)
+        // radioGroup.checkedRadioButtonId -- we are getting radio button from our group.
+        val radioButton = findViewById<RadioButton>(radioGroup.checkedRadioButtonId)
+        processImage(minThreshold, radioButton.text as String)
     }
 
 
@@ -88,40 +90,64 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Button click handler to capture or select an image
+    @RequiresApi(Build.VERSION_CODES.P)
     fun onCaptureOrSelectImageClick(view: View) {
         imagePickerResult.launch("image/*")
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private val imagePickerResult =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let {
                 imageBitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
+
                 processImage()
             }
         }
 
+    private fun showImage(imgMat: Mat)
+    {
+        // Create a new Bitmap named bwBitmap to hold the filtered image
+        val bwBitmap = Bitmap.createBitmap(imgMat.cols(), imgMat.rows(), Bitmap.Config.RGB_565)
+        // Convert the filtered Mat back to a Bitmap format
+        Utils.matToBitmap(imgMat, bwBitmap)
+        imageView.setImageBitmap(bwBitmap)
+    }
+
     // Process the captured or selected image with OpenCV and display the result
     private fun processImage(
-        brightness: Double = -30.0,
-        isGrayScale: Boolean = false
+        minThreshold: Double = 30.0,
+        filterOption: String = "Original Picture"
     ) {
-        // Step 1: Create a Mat object to hold the image data
+        // Create a Mat object to hold the image data
         val imageMat = Mat()
-        // Step 2: Convert the input imageBitmap to a Mat object (OpenCV format)
+        var tmpMat = Mat()
+        // Convert the input imageBitmap to a Mat object (OpenCV format)
         Utils.bitmapToMat(imageBitmap, imageMat)
-        // Step 3: Create a new Mat object named grayMat to hold the grayscale version of the image
-        var grayMat = Mat()
-        // Step 4: Convert the color image (BGR) to grayscale
-        if (isGrayScale)
-            Imgproc.cvtColor(imageMat, grayMat, Imgproc.COLOR_BGR2GRAY) //filter changes.
-        else grayMat = imageMat
-        // Step 5: Adjust the brightness of the grayscale image (optional)
-        Core.add(grayMat, Scalar.all(brightness), grayMat) // Adjust brightness (optional)
-        // Step 6: Create a new Bitmap named bwBitmap to hold the final filtered image
-        val bwBitmap = Bitmap.createBitmap(grayMat.cols(), grayMat.rows(), Bitmap.Config.RGB_565)
-        // Step 7: Convert the filtered grayscale Mat back to a Bitmap format
-        Utils.matToBitmap(grayMat, bwBitmap)
-        // Step 8: Set the filtered Bitmap (bwBitmap) to be displayed in the ImageView
-        imageView.setImageBitmap(bwBitmap)
+
+        // Convert BGRA to BGR.
+        cvtColor(imageMat, imageMat, COLOR_BGRA2BGR);
+
+        // GaussianBlur to filter the noise
+        when (filterOption) {
+            "Original Picture" -> {
+                showImage(imageMat)
+                tmpMat =  imageMat.clone()
+            }
+            "Averaging" -> {
+                blur(imageMat, tmpMat, Size(5.0, 5.0))
+            }
+            "Gaussian Blurring" -> {
+                GaussianBlur(imageMat, tmpMat, Size(5.0, 5.0), 0.0, 0.0)
+            }
+            "Median Blurring" -> {
+                medianBlur(imageMat, tmpMat, 5)
+            }
+            "Bilateral Filtering" -> {
+                bilateralFilter(imageMat, tmpMat, 9, 75.0, 75.0)
+            }
+        }
+
+        showImage(tmpMat)
     }
 }
