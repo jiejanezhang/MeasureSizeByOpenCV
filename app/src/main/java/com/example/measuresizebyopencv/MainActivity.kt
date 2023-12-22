@@ -1,8 +1,6 @@
 package com.example.measuresizebyopencv
 
-import android.R.attr.src
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -15,6 +13,7 @@ import androidx.appcompat.widget.SwitchCompat
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.Mat
+import org.opencv.core.Point
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc.*
 
@@ -25,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var seekbarThresholdMin: SeekBar
     private lateinit var switchFilter: SwitchCompat
     private lateinit var radioGroup: RadioGroup
+    private lateinit var seekBarIteration: SeekBar
 
     private var imageBitmap: Bitmap? = null
 
@@ -36,8 +36,25 @@ class MainActivity : AppCompatActivity() {
         seekbarThresholdMin = findViewById(R.id.seekbarThresholdMin)
         switchFilter = findViewById(R.id.switchFilter)
         radioGroup = findViewById(R.id.radioGroup)
+        seekBarIteration = findViewById(R.id.seekBarIteration)
+
         // Initialize OpenCV
         OpenCVLoader.initDebug()
+
+        // on below line we are initializing our variables.
+        seekBarIteration.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                updateImage()
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                // empty
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                // empty
+            }
+        })
 
         switchFilter.setOnCheckedChangeListener { compoundButton, b ->
             updateImage()
@@ -57,9 +74,6 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-
-        // on below line we are initializing our variables.
-
         // Add listener for our radio group.
         radioGroup.setOnCheckedChangeListener(object: RadioGroup.OnCheckedChangeListener{
 
@@ -67,13 +81,14 @@ class MainActivity : AppCompatActivity() {
                 updateImage()
             }
         }
+
+
         )
     }
 
     private fun updateImage() {
         // Calculate low threshold based on SeekBar progress
         val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin.progress, 0.0, 100.0)
-
         // radioGroup.checkedRadioButtonId -- we are getting radio button from our group.
         val radioButton = findViewById<RadioButton>(radioGroup.checkedRadioButtonId)
         processImage(minThreshold, radioButton.text as String)
@@ -117,7 +132,7 @@ class MainActivity : AppCompatActivity() {
     // Process the captured or selected image with OpenCV and display the result
     private fun processImage(
         minThreshold: Double = 30.0,
-        filterOption: String = "Original Picture"
+        filterOption: String = "None"
     ) {
         // Create a Mat object to hold the image data
         val imageMat = Mat()
@@ -128,28 +143,31 @@ class MainActivity : AppCompatActivity() {
         // Convert BGRA to BGR.
         cvtColor(imageMat, imageMat, COLOR_BGRA2BGR);
 
-        // GaussianBlur to filter the noise
-        when (filterOption) {
-            "Original Picture" -> {
-                showImage(imageMat)
-                tmpMat =  imageMat.clone()
-            }
-            "Averaging" -> {
-                blur(imageMat, tmpMat, Size(5.0, 5.0))
-            }
-            "Gaussian Blurring" -> {
-                GaussianBlur(imageMat, tmpMat, Size(5.0, 5.0), 0.0, 0.0)
-            }
-            "Median Blurring" -> {
-                medianBlur(imageMat, tmpMat, 5)
-            }
-            "Bilateral Filtering" -> {
-                bilateralFilter(imageMat, tmpMat, 9, 75.0, 75.0)
-            }
-        }
+        // Blur to filter the noise
+        blur(imageMat, tmpMat, Size(5.0, 5.0))
 
         // Call Canny for contour detection
         Canny(tmpMat, imageMat, minThreshold, minThreshold * 3.0, 3, true)
+
+        // Morphological Transformations
+        val kernelMat = getStructuringElement(MORPH_RECT, Size(5.0, 5.0))
+        when (filterOption) {
+            "Erosion" -> {
+                erode(imageMat, imageMat, kernelMat )
+            }
+            "Dilation" -> {
+                var iterations = seekBarIteration.progress + 1
+                dilate(imageMat, imageMat, kernelMat, Point(-1.0, -1.0), iterations)
+            }
+            "Closing" -> {
+                var iterations = seekBarIteration.progress + 1
+                morphologyEx(imageMat, imageMat, MORPH_CLOSE, kernelMat, Point(-1.0, -1.0), iterations)
+            }
+            "Gradient" -> {
+                var iterations = seekBarIteration.progress + 1
+                morphologyEx(imageMat, imageMat, MORPH_GRADIENT, kernelMat, Point(-1.0, -1.0), iterations)
+            }
+        }
 
         showImage(imageMat)
     }

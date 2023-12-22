@@ -25,41 +25,44 @@
 
     <RadioGroup
         android:id="@+id/radioGroup"
-        android:layout_width="263dp"
+        android:layout_width="138dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="center|start|center_horizontal">
+        android:layout_gravity="center_horizontal|left"
+        android:visibility="visible">
 
         <RadioButton
             android:id="@+id/OriginRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="true"
-            android:text="Original Picture" />
+            android:text="None"
+            android:visibility="visible" />
 
         <RadioButton
-            android:id="@+id/AveragingRadioButton"
+            android:id="@+id/ErosionRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="false"
-            android:text="Averaging" />
+            android:text="Erosion" />
 
         <RadioButton
-            android:id="@+id/GaussianRadioButton"
+            android:id="@+id/DilationRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Gaussian Blurring" />
+            android:text="Dilation" />
 
         <RadioButton
             android:id="@+id/MedianRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Median Blurring" />
+            android:text="Closing" />
 
         <RadioButton
             android:id="@+id/BilateralRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Bilateral Filtering" />
+            android:text="Gradient"
+            android:visibility="visible" />
 
     </RadioGroup>
 
@@ -69,6 +72,20 @@
         android:layout_height="wrap_content"
         android:text="Lower Thresholder:"
         android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Iteration number: 1~5" />
+
+    <SeekBar
+        android:id="@+id/seekBarIteration"
+        style="@style/Widget.AppCompat.SeekBar.Discrete"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="4"
+        android:progress="0" />
 
     <TextView
         android:id="@+id/textView"
