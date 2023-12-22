@@ -148,6 +148,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        showImage(tmpMat)
+        // Call Canny for contour detection
+        Canny(tmpMat, imageMat, minThreshold, minThreshold * 3.0, 3, true)
+
+        showImage(imageMat)
     }
 }
