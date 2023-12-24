@@ -35,7 +35,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="true"
-            android:text="None"
+            android:text="NONE"
             android:visibility="visible" />
 
         <RadioButton
@@ -43,26 +43,26 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="false"
-            android:text="Erosion" />
+            android:text="SIMPLE " />
 
         <RadioButton
             android:id="@+id/DilationRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Dilation" />
+            android:text="TC89_L1" />
 
         <RadioButton
             android:id="@+id/MedianRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Closing" />
+            android:text="TC89_KCOS" />
 
         <RadioButton
             android:id="@+id/BilateralRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Gradient"
-            android:visibility="visible" />
+            android:visibility="gone" />
 
     </RadioGroup>
 
@@ -77,7 +77,8 @@
         android:id="@+id/textView2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Iteration number: 1~5" />
+        android:text="Iteration number: 1~5"
+        android:visibility="gone" />
 
     <SeekBar
         android:id="@+id/seekBarIteration"
@@ -85,7 +86,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:max="4"
-        android:progress="0" />
+        android:progress="0"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/textView"

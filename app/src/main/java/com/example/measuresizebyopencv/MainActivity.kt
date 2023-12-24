@@ -12,9 +12,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
-import org.opencv.core.Mat
-import org.opencv.core.Point
-import org.opencv.core.Size
+import org.opencv.core.*
+import org.opencv.imgproc.Imgproc
 import org.opencv.imgproc.Imgproc.*
 
 
@@ -116,7 +115,7 @@ class MainActivity : AppCompatActivity() {
             uri?.let {
                 imageBitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
 
-                processImage()
+                updateImage()
             }
         }
 
@@ -132,13 +131,15 @@ class MainActivity : AppCompatActivity() {
     // Process the captured or selected image with OpenCV and display the result
     private fun processImage(
         minThreshold: Double = 30.0,
-        filterOption: String = "None"
+        filterOption: String = "NONE"
     ) {
         // Create a Mat object to hold the image data
         val imageMat = Mat()
         var tmpMat = Mat()
+        val origMat = Mat() // The original picture to be drawn onto.
         // Convert the input imageBitmap to a Mat object (OpenCV format)
         Utils.bitmapToMat(imageBitmap, imageMat)
+        Utils.bitmapToMat(imageBitmap, origMat)
 
         // Convert BGRA to BGR.
         cvtColor(imageMat, imageMat, COLOR_BGRA2BGR);
@@ -151,24 +152,46 @@ class MainActivity : AppCompatActivity() {
 
         // Morphological Transformations
         val kernelMat = getStructuringElement(MORPH_RECT, Size(5.0, 5.0))
+        dilate(imageMat, imageMat, kernelMat, Point(-1.0, -1.0), 2)
+
+        // find contours
+        val contours = ArrayList<MatOfPoint>()
+        val hierarchy = Mat()
         when (filterOption) {
-            "Erosion" -> {
-                erode(imageMat, imageMat, kernelMat )
+            "NONE" -> {
+                findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE )
             }
-            "Dilation" -> {
-                var iterations = seekBarIteration.progress + 1
-                dilate(imageMat, imageMat, kernelMat, Point(-1.0, -1.0), iterations)
+            "SIMPLE" -> {
+                findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE )
             }
-            "Closing" -> {
-                var iterations = seekBarIteration.progress + 1
-                morphologyEx(imageMat, imageMat, MORPH_CLOSE, kernelMat, Point(-1.0, -1.0), iterations)
+            "TC89_L1" -> {
+                findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_L1 )
             }
-            "Gradient" -> {
-                var iterations = seekBarIteration.progress + 1
-                morphologyEx(imageMat, imageMat, MORPH_GRADIENT, kernelMat, Point(-1.0, -1.0), iterations)
+            "TC89_KCOS" -> {
+                findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
             }
         }
 
-        showImage(imageMat)
+        // find the largest contours
+        var maxArea = -1.0
+        var maxIdx = 0
+        for ((index, contour) in contours.withIndex()) {
+            val contourArea = contourArea(contour)
+            if (contourArea < maxArea) {
+                continue
+            }
+            maxArea = contourArea
+            maxIdx = index
+
+        }
+        if (maxArea > 0) {
+            //drawContours(origMat, contours, maxIdx, Scalar(255.0, 0.0, 0.0), 5)
+            val pointList = contours[maxIdx].toList()
+            for ((index, point) in pointList.withIndex()) {
+                circle(origMat, point, 15, Scalar(0.0, 0.0, 255.0), 2)
+            }
+            println("$filterOption point number: ${pointList.size}")
+        }
+        showImage(origMat)
     }
 }
