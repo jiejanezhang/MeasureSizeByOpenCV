@@ -25,7 +25,7 @@
 
     <RadioGroup
         android:id="@+id/radioGroup"
-        android:layout_width="138dp"
+        android:layout_width="313dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal|left"
         android:visibility="visible">
@@ -35,7 +35,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="true"
-            android:text="NONE"
+            android:text="Contour Only"
             android:visibility="visible" />
 
         <RadioButton
@@ -43,19 +43,21 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="false"
-            android:text="SIMPLE " />
+            android:text="Approx Poly Only" />
 
         <RadioButton
             android:id="@+id/DilationRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="TC89_L1" />
+            android:text="Both"
+            android:visibility="visible" />
 
         <RadioButton
             android:id="@+id/MedianRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="TC89_KCOS" />
+            android:text="TC89_KCOS"
+            android:visibility="gone" />
 
         <RadioButton
             android:id="@+id/BilateralRadioButton"

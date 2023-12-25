@@ -157,22 +157,9 @@ class MainActivity : AppCompatActivity() {
         // find contours
         val contours = ArrayList<MatOfPoint>()
         val hierarchy = Mat()
-        when (filterOption) {
-            "NONE" -> {
-                findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE )
-            }
-            "SIMPLE" -> {
-                findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE )
-            }
-            "TC89_L1" -> {
-                findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_L1 )
-            }
-            "TC89_KCOS" -> {
-                findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
-            }
-        }
+        findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
 
-        // find the largest contours
+        // find the largest contours and draw it
         var maxArea = -1.0
         var maxIdx = 0
         for ((index, contour) in contours.withIndex()) {
@@ -184,14 +171,37 @@ class MainActivity : AppCompatActivity() {
             maxIdx = index
 
         }
-        if (maxArea > 0) {
-            //drawContours(origMat, contours, maxIdx, Scalar(255.0, 0.0, 0.0), 5)
-            val pointList = contours[maxIdx].toList()
-            for ((index, point) in pointList.withIndex()) {
-                circle(origMat, point, 15, Scalar(0.0, 0.0, 255.0), 2)
-            }
-            println("$filterOption point number: ${pointList.size}")
+        if (maxArea < 0) {
+            return
         }
+
+        // Call approxPolyDP() to approximate a contour shape and draw it
+        val contour = contours[maxIdx]
+        val contour2f = MatOfPoint2f()
+        contour.convertTo(contour2f, CvType.CV_32FC2)
+        val approxContour2f = MatOfPoint2f()
+        val epsilon = 0.007 * arcLength(contour2f, true)
+        approxPolyDP(contour2f, approxContour2f, epsilon, true)
+        val curve = MatOfPoint()
+        approxContour2f.convertTo(curve, CvType.CV_32S)
+        val curveList = ArrayList<MatOfPoint>()
+        curveList.add(curve)
+
+        when (filterOption) {
+            "Contour Only" -> {
+                drawContours(origMat, contours, maxIdx, Scalar(255.0, 0.0, 0.0), 15)
+            }
+            "Approx Poly Only" -> {
+                drawContours(origMat, curveList, 0, Scalar(0.0, 255.0, 255.0), 15)
+
+            }
+            "Both" -> {
+                drawContours(origMat, contours, maxIdx, Scalar(255.0, 0.0, 0.0), 15)
+                drawContours(origMat, curveList, 0, Scalar(0.0, 255.0, 255.0), 15)
+            }
+        }
+
         showImage(origMat)
+
     }
 }
