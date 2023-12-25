@@ -35,7 +35,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="true"
-            android:text="Contour Only"
+            android:text="Processed Curve Only"
             android:visibility="visible" />
 
         <RadioButton
@@ -43,7 +43,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="false"
-            android:text="Approx Poly Only" />
+            android:text="Approx Poly Only"
+            android:visibility="visible" />
 
         <RadioButton
             android:id="@+id/DilationRadioButton"
@@ -56,8 +57,8 @@
             android:id="@+id/MedianRadioButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="TC89_KCOS"
-            android:visibility="gone" />
+            android:text="None"
+            android:visibility="visible" />
 
         <RadioButton
             android:id="@+id/BilateralRadioButton"
