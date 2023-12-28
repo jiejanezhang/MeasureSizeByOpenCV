@@ -90,7 +90,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateImage() {
         // Calculate low threshold based on SeekBar progress
-        val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin.progress, 0.0, 100.0)
+        val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin.progress, 0.0, 30.0)
         // radioGroup.checkedRadioButtonId -- we are getting radio button from our group.
         val radioButton = findViewById<RadioButton>(radioGroup.checkedRadioButtonId)
         processImage(minThreshold, radioButton.text as String)
@@ -122,36 +122,43 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    private fun distSquare(aPoint: Point, bPoint: Point): Double{
+        return (aPoint.x - bPoint.x).pow(2) +
+                (aPoint.y - bPoint.y).pow(2)
+    }
+
+    private fun isSharp(query_A: Point, B: Point, C: Point): Boolean{
+        // cosA= [b²＋c²－a²]/ (2bc)
+        val square_b = distSquare(query_A, C)
+        val square_c = distSquare(query_A, B)
+        val square_a = distSquare(B, C)
+        val cosA = (square_b + square_c - square_a)/(2 * sqrt(square_b) * sqrt(square_c))
+        // cos80 = 0.174
+        println("square_b: $square_b, square_c: $square_c, square_a: $square_a, cosA: ${cosA}")
+        return cosA > 0.174
+    }
     // Process contour:
     // 1. Detect the convex points with bounding box.
     // 2. If it is sharp angle, remove the convex.
-    private fun processContour(contour : MatOfPoint, origMat: Mat, toDrawPoly: Boolean, toDrawResult: Boolean): Boolean  {
-        // approximate a contour shape
-        val contour2f = MatOfPoint2f()
-        contour.convertTo(contour2f, CvType.CV_32FC2)
-        val epsilon = 0.01 * arcLength(contour2f, true)
-        val approxContour2f = MatOfPoint2f()
-        approxPolyDP(contour2f, approxContour2f, epsilon, true)
-        val curve = MatOfPoint()
-        approxContour2f.convertTo(curve, CvType.CV_32S)
+    private fun processContour(contour : MatOfPoint, origMat: Mat, toDrawPoly: Boolean, toDrawResult: Boolean): MatOfPoint  {
         val curveList = ArrayList<MatOfPoint>()
-        curveList.add(curve)
+        curveList.add(contour)
 
-        if (toDrawPoly) drawContours(origMat, curveList, 0, Scalar(255.0, 255.0, 0.0), 5)
+        if (toDrawPoly) drawContours(origMat, curveList, 0, Scalar(255.0, 255.0, .0), 11)
 
         // Find the binding box Rect of approx Poly DP
-        val boundRect: Rect = boundingRect(curve)
+        val boundRect: Rect = boundingRect(contour)
         rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(255.0, 0.0, 255.0), 5, 8, 0);
         println("Bounding Box tl: [${boundRect.tl().x} ${boundRect.tl().y}]   br: [${boundRect.br().x} ${boundRect.br().y}]")
 
         // Judge the bounding points
-        val pointList = curve.toList()
+        val pointList = contour.toList()
         var newPointList: MutableList<Point> = mutableListOf()
         var updated = false
         for ( (index, point) in pointList.withIndex()) {
             println("$index: [${point.x} ${point.y}]")
             var textPoint = Point(point.x-10, point.y+20)
-            putText(origMat,index.toString(), textPoint, FONT_HERSHEY_PLAIN, 10.0, Scalar(0.0, 0.0, 0.0), 8)
+            putText(origMat,index.toString(), textPoint, FONT_HERSHEY_PLAIN, 10.0, Scalar(255.0, 255.0, 0.0), 11)
 
             // Check if the point is in bounding box
             if (point.x in boundRect.tl().x - 2 .. boundRect.tl().x + 2 ||
@@ -160,25 +167,15 @@ class MainActivity : AppCompatActivity() {
                 point.y in boundRect.br().y - 2 .. boundRect.br().y + 2 )
             {
                 println("Point is in bounding box")
-                //circle(origMat, point, 100, Scalar(0.0, 0.0, 0.0), 5)
                 val preIndex = if (index == 0)  pointList.size - 1 else index - 1
                 val nextIndex = if (index == pointList.size -1 )  0 else index + 1
                 val prePoint = pointList[preIndex]
                 val nextPoint = pointList[nextIndex]
-                // 邻边a长度平方
-                val aSquare = (prePoint.x - point.x).pow(2) +
-                        (prePoint.y - point.y).pow(2)
-                // 邻边b长度平方
-                val bSquare = (nextPoint.x - point.x).pow(2) +
-                        (nextPoint.y - point.y).pow(2)
-                // 对边c长度平方
-                val cSquare = (nextPoint.x - prePoint.x).pow(2) + (nextPoint.y - prePoint.y).pow(2)
                 println("Previous Point is $preIndex. Next Point is $nextIndex")
 
-                // 如果形成锐角则是毛刺，去掉。
-                if ( cSquare < aSquare + bSquare ) {
+                // 如果形成<30°锐角则是毛刺，去掉。
+                if ( isSharp(point, prePoint, nextPoint) ) {
                     println("Remove this point.")
-                    //circle(origMat, point, 100, Scalar(255.0, 0.0, 0.0), 5)
                     updated = true
                 }
                 else {
@@ -197,9 +194,24 @@ class MainActivity : AppCompatActivity() {
             contour.fromArray(*newPointList.toTypedArray())
             curveList.removeAt(0)
             curveList.add(contour)
-            if (toDrawResult) drawContours(origMat, curveList, 0, Scalar(255.0, 255.0, 255.0), 9)
         }
-        return updated
+        if (toDrawResult) {
+            drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
+/*            for ((index, point) in contour.toList().withIndex()) {
+                println("$index: [${point.x} ${point.y}]")
+                var textPoint = Point(point.x + 50, point.y + 20)
+                putText(
+                     origMat,
+                    index.toString(),
+                    textPoint,
+                    FONT_HERSHEY_PLAIN,
+                    10.0,
+                    Scalar(255.0, 255.0, 255.0),
+                    11
+                )
+            }*/
+        }
+        return contour
     }
 
     private fun showImage(imgMat: Mat)
@@ -214,7 +226,7 @@ class MainActivity : AppCompatActivity() {
     // Process the captured or selected image with OpenCV and display the result
     private fun processImage(
         minThreshold: Double = 30.0,
-        filterOption: String = "NONE"
+        filterOption: String = "None"
     ) {
         // Create a Mat object to hold the image data
         val imageMat = Mat()
@@ -271,10 +283,21 @@ class MainActivity : AppCompatActivity() {
         }
         drawContours(origMat, contours, maxIdx, Scalar(255.0, 0.0, 0.0), 15)
 
-        // Call approxPolyDP() to approximate a contour shape and draw it
-        val contour = contours[maxIdx]
-        processContour(contour, origMat, toDrawPoly, toDrawResult)
+        // approximate a contour shape
+        var contour = contours[maxIdx]
+        val contour2f = MatOfPoint2f()
+        contour.convertTo(contour2f, CvType.CV_32FC2)
+        val epsilon = 0.01 * arcLength(contour2f, true)
+        val approxContour2f = MatOfPoint2f()
+        approxPolyDP(contour2f, approxContour2f, epsilon, true)
+        approxContour2f.convertTo(contour, CvType.CV_32S)
 
+        // Process the contour to remove the sharp part and get the main body
+        val iteration = seekBarIteration.progress + 1
+        repeat( iteration ) {
+            Utils.bitmapToMat(imageBitmap, origMat)
+            contour = processContour(contour, origMat, toDrawPoly, toDrawResult)
+        }
         showImage(origMat)
 
     }

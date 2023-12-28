@@ -43,8 +43,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="false"
-            android:text="Approx Poly Only"
-            android:visibility="visible" />
+            android:text="Approx Poly Only" />
 
         <RadioButton
             android:id="@+id/DilationRadioButton"
@@ -90,7 +89,7 @@
         android:layout_height="wrap_content"
         android:max="4"
         android:progress="0"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
     <TextView
         android:id="@+id/textView"
