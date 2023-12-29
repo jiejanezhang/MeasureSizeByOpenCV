@@ -19,7 +19,11 @@ import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-
+enum class ANGLE {
+    ANGLE_VERY_SHARP,
+    ANGLE_BARELY_SHARP, // 70°~80°
+    ANGLE_OTHER
+}
 class MainActivity : AppCompatActivity() {
 
     private lateinit var imageView: ImageView
@@ -127,20 +131,24 @@ class MainActivity : AppCompatActivity() {
                 (aPoint.y - bPoint.y).pow(2)
     }
 
-    private fun isSharp(query_A: Point, B: Point, C: Point): Boolean{
+    private fun isSharp(query_A: Point, B: Point, C: Point): ANGLE{
         // cosA= [b²＋c²－a²]/ (2bc)
         val square_b = distSquare(query_A, C)
         val square_c = distSquare(query_A, B)
         val square_a = distSquare(B, C)
         val cosA = (square_b + square_c - square_a)/(2 * sqrt(square_b) * sqrt(square_c))
-        // cos80 = 0.174
         println("square_b: $square_b, square_c: $square_c, square_a: $square_a, cosA: ${cosA}")
-        return cosA > 0.174
+        // cos80 = 0.174
+        // cos65 = 0.423
+
+        if (cosA > 0.423) return ANGLE.ANGLE_VERY_SHARP
+        if (cosA < 0.423 && cosA > 0) return ANGLE.ANGLE_BARELY_SHARP
+        return ANGLE.ANGLE_OTHER
     }
     // Process contour:
     // 1. Detect the convex points with bounding box.
     // 2. If it is sharp angle, remove the convex.
-    private fun processContour(contour : MatOfPoint, origMat: Mat, toDrawPoly: Boolean, toDrawResult: Boolean): MatOfPoint  {
+    private fun processContour(contour : MatOfPoint, perimeter: Double, origMat: Mat, toDrawPoly: Boolean, toDrawResult: Boolean): MatOfPoint  {
         val curveList = ArrayList<MatOfPoint>()
         curveList.add(contour)
 
@@ -173,14 +181,29 @@ class MainActivity : AppCompatActivity() {
                 val nextPoint = pointList[nextIndex]
                 println("Previous Point is $preIndex. Next Point is $nextIndex")
 
-                // 如果形成<30°锐角则是毛刺，去掉。
-                if ( isSharp(point, prePoint, nextPoint) ) {
-                    println("Remove this point.")
-                    updated = true
-                }
-                else {
-                    println("Keep this point.")
-                    newPointList.add(point)
+                when (isSharp(point, prePoint, nextPoint )) {
+                    // <65°
+                    ANGLE.ANGLE_VERY_SHARP -> {
+                        println("Remove this point.")
+                        updated = true
+                    }
+                    // 65°<90°
+                    ANGLE.ANGLE_BARELY_SHARP -> {
+                        if (sqrt(distSquare(point, prePoint)) > 0.2 * perimeter ||
+                            sqrt(distSquare(point, nextPoint)) > 0.2 * perimeter    )
+                        {
+                            println("Corner point. Keep this point.")
+                            newPointList.add(point)
+                        }
+                        else{
+                            println("Remove this point.")
+                            updated = true
+                        }
+                    }
+                    ANGLE.ANGLE_OTHER -> {
+                        println("Keep this point.")
+                        newPointList.add(point)
+                    }
                 }
             }
             else {
@@ -197,19 +220,6 @@ class MainActivity : AppCompatActivity() {
         }
         if (toDrawResult) {
             drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
-/*            for ((index, point) in contour.toList().withIndex()) {
-                println("$index: [${point.x} ${point.y}]")
-                var textPoint = Point(point.x + 50, point.y + 20)
-                putText(
-                     origMat,
-                    index.toString(),
-                    textPoint,
-                    FONT_HERSHEY_PLAIN,
-                    10.0,
-                    Scalar(255.0, 255.0, 255.0),
-                    11
-                )
-            }*/
         }
         return contour
     }
@@ -287,7 +297,8 @@ class MainActivity : AppCompatActivity() {
         var contour = contours[maxIdx]
         val contour2f = MatOfPoint2f()
         contour.convertTo(contour2f, CvType.CV_32FC2)
-        val epsilon = 0.01 * arcLength(contour2f, true)
+        val perimeter = arcLength(contour2f, true)
+        val epsilon = 0.01 * perimeter
         val approxContour2f = MatOfPoint2f()
         approxPolyDP(contour2f, approxContour2f, epsilon, true)
         approxContour2f.convertTo(contour, CvType.CV_32S)
@@ -296,7 +307,7 @@ class MainActivity : AppCompatActivity() {
         val iteration = seekBarIteration.progress + 1
         repeat( iteration ) {
             Utils.bitmapToMat(imageBitmap, origMat)
-            contour = processContour(contour, origMat, toDrawPoly, toDrawResult)
+            contour = processContour(contour, perimeter, origMat, toDrawPoly, toDrawResult)
         }
         showImage(origMat)
 
