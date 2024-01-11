@@ -1,1 +1,0 @@
-C:\Users\jzhan66\AndroidStudioProjects\MeasureSizeByOpenCV\opencv\build\intermediates\cxx\RelWithDebInfo\254b2b2y\obj\x86

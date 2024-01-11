@@ -21,18 +21,21 @@ import kotlin.math.sqrt
 
 enum class ANGLE {
     ANGLE_VERY_SHARP,
-    ANGLE_BARELY_SHARP, // 70°~80°
+    ANGLE_BARELY_SHARP, // 65°~90°
     ANGLE_OTHER
 }
 class MainActivity : AppCompatActivity() {
 
     private lateinit var imageView: ImageView
     private lateinit var seekbarThresholdMin: SeekBar
+    private lateinit var seekbarThresholdMin2: SeekBar
     private lateinit var switchFilter: SwitchCompat
     private lateinit var radioGroup: RadioGroup
     private lateinit var seekBarIteration: SeekBar
 
     private var imageBitmap: Bitmap? = null
+    private var contourContainer: MatOfPoint? = null
+    private var contourCoin: MatOfPoint? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,6 +43,7 @@ class MainActivity : AppCompatActivity() {
 
         imageView = findViewById(R.id.imageView)
         seekbarThresholdMin = findViewById(R.id.seekbarThresholdMin)
+        seekbarThresholdMin2 = findViewById(R.id.seekbarThresholdMin2)
         switchFilter = findViewById(R.id.switchFilter)
         radioGroup = findViewById(R.id.radioGroup)
         seekBarIteration = findViewById(R.id.seekBarIteration)
@@ -50,7 +54,7 @@ class MainActivity : AppCompatActivity() {
         // on below line we are initializing our variables.
         seekBarIteration.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                updateImage()
+                updateImage(updateCoin = false)
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
@@ -68,7 +72,22 @@ class MainActivity : AppCompatActivity() {
 
         seekbarThresholdMin.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                updateImage()
+                updateImage(updateCoin = false)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                // empty
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                // empty
+            }
+
+        })
+
+        seekbarThresholdMin2.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                updateImage(updateContainer = false)
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
@@ -92,12 +111,32 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun updateImage() {
+    private fun updateImage(updateContainer: Boolean = true, updateCoin: Boolean = true) {
         // Calculate low threshold based on SeekBar progress
-        val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin.progress, 0.0, 30.0)
         // radioGroup.checkedRadioButtonId -- we are getting radio button from our group.
         val radioButton = findViewById<RadioButton>(radioGroup.checkedRadioButtonId)
-        processImage(minThreshold, radioButton.text as String)
+        var origMat = Mat() // The original picture to be drawn onto.
+        // Convert the input imageBitmap to a Mat object (OpenCV format)
+        Utils.bitmapToMat(imageBitmap, origMat)
+        if (updateContainer) {
+            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin.progress, 0.0, 10.0)
+            contourContainer = processImage(origMat, minThreshold, radioButton.text as String)
+        }
+        if (updateCoin) {
+            val minThreshold2 = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 0.0, 100.0)
+            contourCoin = processCoin(origMat, minThreshold2)
+        }
+        if ( updateContainer && contourContainer != null) {
+            val curveList = ArrayList<MatOfPoint>()
+            curveList.add(contourContainer!!)
+            drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
+        }
+        if ( contourCoin != null) {
+            val curveList = ArrayList<MatOfPoint>()
+            curveList.add(contourCoin!!)
+            drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
+        }
+        showImage(origMat)
     }
 
 
@@ -138,9 +177,7 @@ class MainActivity : AppCompatActivity() {
         val square_a = distSquare(B, C)
         val cosA = (square_b + square_c - square_a)/(2 * sqrt(square_b) * sqrt(square_c))
         println("square_b: $square_b, square_c: $square_c, square_a: $square_a, cosA: ${cosA}")
-        // cos80 = 0.174
         // cos65 = 0.423
-
         if (cosA > 0.423) return ANGLE.ANGLE_VERY_SHARP
         if (cosA < 0.423 && cosA > 0) return ANGLE.ANGLE_BARELY_SHARP
         return ANGLE.ANGLE_OTHER
@@ -164,7 +201,7 @@ class MainActivity : AppCompatActivity() {
         var newPointList: MutableList<Point> = mutableListOf()
         var updated = false
         for ( (index, point) in pointList.withIndex()) {
-            println("$index: [${point.x} ${point.y}]")
+            println("$index: [${point.x}0.2 ${point.y}]")
             var textPoint = Point(point.x-10, point.y+20)
             putText(origMat,index.toString(), textPoint, FONT_HERSHEY_PLAIN, 10.0, Scalar(255.0, 255.0, 0.0), 11)
 
@@ -184,23 +221,29 @@ class MainActivity : AppCompatActivity() {
                 when (isSharp(point, prePoint, nextPoint )) {
                     // <65°
                     ANGLE.ANGLE_VERY_SHARP -> {
+                        println("ANGLE_VERY_SHARP")
                         println("Remove this point.")
                         updated = true
                     }
                     // 65°<90°
                     ANGLE.ANGLE_BARELY_SHARP -> {
-                        if (sqrt(distSquare(point, prePoint)) > 0.2 * perimeter ||
-                            sqrt(distSquare(point, nextPoint)) > 0.2 * perimeter    )
+                        println("ANGLE_BARELY_SHARP")
+                        val b = sqrt(distSquare(point, prePoint))
+                        val c = sqrt(distSquare(point, nextPoint))
+                        if (b > 0.07 * perimeter ||
+                            c > 0.07 * perimeter )
                         {
                             println("Corner point. Keep this point.")
                             newPointList.add(point)
                         }
                         else{
                             println("Remove this point.")
+                            println("b: $b  c: $c  perimeter: $perimeter ")
                             updated = true
                         }
                     }
                     ANGLE.ANGLE_OTHER -> {
+                        println("ANGLE_OTHER.")
                         println("Keep this point.")
                         newPointList.add(point)
                     }
@@ -235,16 +278,17 @@ class MainActivity : AppCompatActivity() {
 
     // Process the captured or selected image with OpenCV and display the result
     private fun processImage(
+        origMat: Mat,
         minThreshold: Double = 30.0,
         filterOption: String = "None"
-    ) {
+    ) : MatOfPoint? {
         // Create a Mat object to hold the image data
         val imageMat = Mat()
         var tmpMat = Mat()
-        val origMat = Mat() // The original picture to be drawn onto.
+        //val origMat = Mat() // The original picture to be drawn onto.
         // Convert the input imageBitmap to a Mat object (OpenCV format)
         Utils.bitmapToMat(imageBitmap, imageMat)
-        Utils.bitmapToMat(imageBitmap, origMat)
+        //Utils.bitmapToMat(imageBitmap, origMat)
 
         // Convert BGRA to BGR.
         cvtColor(imageMat, imageMat, COLOR_BGRA2BGR);
@@ -277,7 +321,7 @@ class MainActivity : AppCompatActivity() {
 
         }
         if (maxArea < 0) {
-            return
+            return null
         }
 
         var toDrawResult = false
@@ -309,7 +353,60 @@ class MainActivity : AppCompatActivity() {
             Utils.bitmapToMat(imageBitmap, origMat)
             contour = processContour(contour, perimeter, origMat, toDrawPoly, toDrawResult)
         }
-        showImage(origMat)
+        return contour
 
+    }
+
+
+    // Process the captured or selected image with OpenCV and display the result
+    private fun processCoin(
+        origMat: Mat,
+        minThreshold2: Double = 30.0,
+        filterOption: String = "None"
+    ) : MatOfPoint? {
+        // Create a Mat object to hold the image data
+        val imageMat = Mat()
+        var tmpMat = Mat()
+
+        // Convert the input imageBitmap to a Mat object (OpenCV format)
+        Utils.bitmapToMat(imageBitmap, imageMat)
+
+        // Convert BGRA to BGR.
+        cvtColor(imageMat, imageMat, COLOR_BGR2GRAY);
+
+        // Blur to filter the noise
+        blur(imageMat, tmpMat, Size(5.0, 5.0))
+
+        // Call Canny for contour detection
+        Canny(tmpMat, imageMat, minThreshold2, minThreshold2 * 3.0, 3, true)
+
+        // Morphological Transformations
+        val kernelMat = getStructuringElement(MORPH_RECT, Size(5.0, 5.0))
+        dilate(imageMat, imageMat, kernelMat, Point(-1.0, -1.0), 2)
+
+        // find contours
+        val contours = ArrayList<MatOfPoint>()
+        val hierarchy = Mat()
+        findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
+
+        // find the largest contours and draw it
+        var maxArea = -1.0
+        var maxIdx = 0
+        for ((index, contour) in contours.withIndex()) {
+            val contourArea = contourArea(contour)
+            if (contourArea < maxArea) {
+                continue
+            }
+            maxArea = contourArea
+            maxIdx = index
+
+        }
+        if (maxArea < 0) {
+            return null
+        }
+        val contour = contours[maxIdx]
+        val boundRect: Rect = boundingRect(contour)
+        rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(255.0, 0.0, 0.0), 15, 8, 0);
+        return contour
     }
 }
