@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.telecom.Call.Details
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,11 +14,10 @@ import androidx.appcompat.widget.SwitchCompat
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
-import org.opencv.imgproc.Imgproc
 import org.opencv.imgproc.Imgproc.*
-import kotlin.math.abs
-import kotlin.math.pow
-import kotlin.math.sqrt
+import java.util.*
+import kotlin.math.*
+
 
 enum class ANGLE {
     ANGLE_VERY_SHARP,
@@ -126,7 +126,7 @@ class MainActivity : AppCompatActivity() {
             val minThreshold2 = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 0.0, 100.0)
             contourCoin = processCoin(origMat, minThreshold2)
         }
-        if ( updateContainer && contourContainer != null) {
+        if ( contourContainer != null) {
             val curveList = ArrayList<MatOfPoint>()
             curveList.add(contourContainer!!)
             drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
@@ -164,6 +164,91 @@ class MainActivity : AppCompatActivity() {
                 updateImage()
             }
         }
+
+
+    // Button click handler to capture or select an image
+    @RequiresApi(Build.VERSION_CODES.P)
+    fun onStartToMeasureSizeClick(view: View) {
+        if (contourCoin == null || contourContainer == null) {
+            return
+        }
+        val volumn = calculateVolumn()
+    }
+
+    private fun calculateVolumn(): Double{
+        val origMat = Mat()
+        Utils.bitmapToMat(imageBitmap, origMat)
+        val boundRect: Rect = boundingRect(contourCoin)
+        val baseMeter = boundRect.height / 22.25 // 像素长度/mm
+
+        val comparator: Comparator<MutableList<Point>?> = object : Comparator<MutableList<Point>?> {
+            override fun compare(vector1: MutableList<Point>?, vector2: MutableList<Point>?): Int {
+                return if (vector1!![0].y > vector2!![0].y)
+                    1
+                else
+                    -1
+            }
+        }
+
+        // Sort the pointers in order of Y
+        var pointList: MutableList<Point> = contourContainer!!.toList()
+        var vectorList: MutableList<MutableList<Point>> = mutableListOf()
+        println("find the vectors:")
+        for ( (index, point) in pointList.withIndex()){
+            val vector : MutableList<Point> = mutableListOf()
+            val nextIndex = if (index == pointList.size -1 )  0 else index + 1
+            if (pointList[index].y < pointList[nextIndex].y){
+                vector.add(pointList[index])
+                vector.add(pointList[nextIndex])
+                println("Vector($index): $index -> $nextIndex")
+            }
+            else{
+                vector.add(pointList[nextIndex])
+                vector.add(pointList[index])
+                println("Vector($index): $nextIndex -> $index")
+            }
+            vectorList.add(vector)
+        }
+
+        println("Order the vectors:")
+        Collections.sort(vectorList, comparator)
+        for ( (index, vector) in vectorList.withIndex()) {
+            line(origMat, vector[0], vector[1],  Scalar(0.0, 0.0, 255.0), 9)
+            println("Vector($index): [${vector[0].x}, ${vector[0].y}] -> [${vector[1].x}, ${vector[1].y}]")
+        }
+
+
+        val maxY = (vectorList[vectorList.size-1][1].y).toInt()
+        val minY = (vectorList[0][0].y).toInt()
+        var volume = 0.0
+        val sliceHeight = 20
+        for (y in minY..maxY step sliceHeight)
+        {
+            println("Scan Y: $y")
+            val jointPoints : MutableList<Point> = mutableListOf()
+            for ( vector in vectorList){
+                if ( y >= vector[0].y && y <= vector[1].y ) {
+                    println("Vector: [${vector[0].x}, ${vector[0].y}] -> [${vector[1].x}, ${vector[1].y}]")
+                    // x = x1 + (y-y1)(x1-x2)/(y1-y2)
+                    val x = vector[0].x + (y - vector[0].y)*(vector[0].x - vector[1].x)/(vector[0].y - vector[1].y)
+                    jointPoints.add(Point(x, y.toDouble()))
+                    println("Joint Point:$x, ${y.toDouble()}")
+                }
+            }
+            println("Joint Points Number: ${jointPoints.size}")
+            if ( jointPoints.size >= 2) {
+                line(origMat, jointPoints[0], jointPoints[1], Scalar(0.0, 0.0, 255.0), 9)
+                // Volume = pi*r²*h
+                volume += sliceHeight * PI * abs(jointPoints[0].x - jointPoints[1].x).pow(2) / 4
+            }
+        }
+        showImage(origMat)
+
+        // volume /= baseMeter.pow(3)
+
+        println("Volume: $volume")
+        return volume
+    }
 
     private fun distSquare(aPoint: Point, bPoint: Point): Double{
         return (aPoint.x - bPoint.x).pow(2) +
