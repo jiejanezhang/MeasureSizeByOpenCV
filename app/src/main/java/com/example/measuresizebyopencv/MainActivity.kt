@@ -29,13 +29,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var imageView: ImageView
     private lateinit var seekbarThresholdMin: SeekBar
     private lateinit var seekbarThresholdMin2: SeekBar
+    private lateinit var seekbarThresholdMin3: SeekBar
     private lateinit var switchFilter: SwitchCompat
     private lateinit var radioGroup: RadioGroup
     private lateinit var seekBarIteration: SeekBar
 
     private var imageBitmap: Bitmap? = null
     private var contourContainer: MatOfPoint? = null
-    private var contourCoin: MatOfPoint? = null
+    private var contourTopCoin: MatOfPoint? = null
+    private var contourBackCoin: MatOfPoint? = null
+    private var baseCoinSize = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +47,7 @@ class MainActivity : AppCompatActivity() {
         imageView = findViewById(R.id.imageView)
         seekbarThresholdMin = findViewById(R.id.seekbarThresholdMin)
         seekbarThresholdMin2 = findViewById(R.id.seekbarThresholdMin2)
+        seekbarThresholdMin3 = findViewById(R.id.seekBarThresholdMin3)
         switchFilter = findViewById(R.id.switchFilter)
         radioGroup = findViewById(R.id.radioGroup)
         seekBarIteration = findViewById(R.id.seekBarIteration)
@@ -54,7 +58,7 @@ class MainActivity : AppCompatActivity() {
         // on below line we are initializing our variables.
         seekBarIteration.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                updateImage(updateCoin = false)
+                updateImage(updateTopCoin = false)
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
@@ -72,7 +76,7 @@ class MainActivity : AppCompatActivity() {
 
         seekbarThresholdMin.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                updateImage(updateCoin = false)
+                updateImage(updateTopCoin = false, updateBackCoin = false)
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
@@ -87,7 +91,7 @@ class MainActivity : AppCompatActivity() {
 
         seekbarThresholdMin2.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                updateImage(updateContainer = false)
+                updateImage(updateContainer = false, updateBackCoin = false)
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
@@ -99,6 +103,19 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        seekbarThresholdMin3.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                updateImage(updateContainer = false, updateTopCoin = false)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                // empty
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                // empty
+            }
+        })
         // Add listener for our radio group.
         radioGroup.setOnCheckedChangeListener(object: RadioGroup.OnCheckedChangeListener{
 
@@ -111,7 +128,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun updateImage(updateContainer: Boolean = true, updateCoin: Boolean = true) {
+    private fun updateImage(updateContainer: Boolean = true, updateTopCoin: Boolean = true, updateBackCoin: Boolean = true) {
         // Calculate low threshold based on SeekBar progress
         // radioGroup.checkedRadioButtonId -- we are getting radio button from our group.
         val radioButton = findViewById<RadioButton>(radioGroup.checkedRadioButtonId)
@@ -120,22 +137,51 @@ class MainActivity : AppCompatActivity() {
         Utils.bitmapToMat(imageBitmap, origMat)
         if (updateContainer) {
             val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin.progress, 0.0, 10.0)
-            contourContainer = processImage(origMat, minThreshold, radioButton.text as String)
+            contourContainer = processContainer(origMat, minThreshold, radioButton.text as String)
         }
-        if (updateCoin) {
-            val minThreshold2 = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 0.0, 100.0)
-            contourCoin = processCoin(origMat, minThreshold2)
+        if (updateTopCoin) {
+            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 40.0, 100.0)
+            contourTopCoin = processTopCoin(origMat, minThreshold)
+        }
+        if (updateBackCoin) {
+            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin3.progress, 0.0, 40.0)
+            contourBackCoin = processBackCoin(origMat, minThreshold)
         }
         if ( contourContainer != null) {
             val curveList = ArrayList<MatOfPoint>()
             curveList.add(contourContainer!!)
             drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
         }
-        if ( contourCoin != null) {
+        var topCoinSize = 0
+        var backCoinSize = 0
+        if ( contourTopCoin != null) {
             val curveList = ArrayList<MatOfPoint>()
-            curveList.add(contourCoin!!)
-            drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
+            curveList.add(contourTopCoin!!)
+            val boundRect: Rect = boundingRect(contourTopCoin)
+            if ((abs(boundRect.width-boundRect.height) <5) && boundRect.width > 150 && boundRect.width <500)
+            {
+                topCoinSize = boundRect.width
+                println("TopCoin: $topCoinSize")
+                rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0);
+            }
         }
+        if ( contourBackCoin != null) {
+            val curveList = ArrayList<MatOfPoint>()
+            curveList.add(contourBackCoin!!)
+            val boundRect: Rect = boundingRect(contourBackCoin)
+            if ((abs(boundRect.width-boundRect.height) <5) && boundRect.width > 150 && boundRect.width <500){
+                backCoinSize = boundRect.width
+                println("BackCoin:$backCoinSize")
+                rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0);
+            }
+        }
+        if (topCoinSize >0 && backCoinSize >0 ) {
+            baseCoinSize = (topCoinSize + backCoinSize) /2
+        }
+        else{
+            baseCoinSize = 310 // Based on the data from several photoes
+        }
+        println("TopCoin: $topCoinSize   BackCoin:$backCoinSize    BaseCoin:$baseCoinSize")
         showImage(origMat)
     }
 
@@ -169,17 +215,16 @@ class MainActivity : AppCompatActivity() {
     // Button click handler to capture or select an image
     @RequiresApi(Build.VERSION_CODES.P)
     fun onStartToMeasureSizeClick(view: View) {
-        if (contourCoin == null || contourContainer == null) {
+        if (contourTopCoin == null || contourBackCoin == null || contourContainer == null) {
             return
         }
+
         val volume = calculateVolume()
     }
 
     private fun calculateVolume(): Double{
         val origMat = Mat()
         Utils.bitmapToMat(imageBitmap, origMat)
-        val boundRect: Rect = boundingRect(contourCoin)
-        val baseMeter = boundRect.height / 22.25 // 像素长度/mm
 
         val comparator: Comparator<MutableList<Point>?> = object : Comparator<MutableList<Point>?> {
             override fun compare(vector1: MutableList<Point>?, vector2: MutableList<Point>?): Int {
@@ -224,18 +269,18 @@ class MainActivity : AppCompatActivity() {
         val sliceHeight = 20
         for (y in minY..maxY step sliceHeight)
         {
-            println("Scan Y: $y")
+            //println("Scan Y: $y")
             val jointPoints : MutableList<Point> = mutableListOf()
             for ( vector in vectorList){
                 if ( y >= vector[0].y && y <= vector[1].y ) {
-                    println("Vector: [${vector[0].x}, ${vector[0].y}] -> [${vector[1].x}, ${vector[1].y}]")
+                    //println("Vector: [${vector[0].x}, ${vector[0].y}] -> [${vector[1].x}, ${vector[1].y}]")
                     // x = x1 + (y-y1)(x1-x2)/(y1-y2)
                     val x = vector[0].x + (y - vector[0].y)*(vector[0].x - vector[1].x)/(vector[0].y - vector[1].y)
                     jointPoints.add(Point(x, y.toDouble()))
-                    println("Joint Point:$x, ${y.toDouble()}")
+                    //println("Joint Point:$x, ${y.toDouble()}")
                 }
             }
-            println("Joint Points Number: ${jointPoints.size}")
+            //println("Joint Points Number: ${jointPoints.size}")
             if ( jointPoints.size >= 2) {
                 line(origMat, jointPoints[0], jointPoints[1], Scalar(0.0, 0.0, 255.0), 9)
                 // Volume = pi*r²*h
@@ -244,7 +289,8 @@ class MainActivity : AppCompatActivity() {
         }
         showImage(origMat)
 
-        // volume /= baseMeter.pow(3)
+        val baseMeter = baseCoinSize / 22.25 // 像素长度/mm
+        volume /= baseMeter.pow(3)
 
         println("Volume: $volume")
         return volume
@@ -362,7 +408,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Process the captured or selected image with OpenCV and display the result
-    private fun processImage(
+    private fun processContainer(
         origMat: Mat,
         minThreshold: Double = 30.0,
         filterOption: String = "None"
@@ -443,10 +489,10 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    // Process the captured or selected image with OpenCV and display the result
-    private fun processCoin(
+    // Process the Top Coin
+    private fun processTopCoin(
         origMat: Mat,
-        minThreshold2: Double = 30.0,
+        minThreshold: Double = 30.0,
         filterOption: String = "None"
     ) : MatOfPoint? {
         // Create a Mat object to hold the image data
@@ -463,7 +509,7 @@ class MainActivity : AppCompatActivity() {
         blur(imageMat, tmpMat, Size(5.0, 5.0))
 
         // Call Canny for contour detection
-        Canny(tmpMat, imageMat, minThreshold2, minThreshold2 * 3.0, 3, true)
+        Canny(tmpMat, imageMat, minThreshold, minThreshold * 3.0, 3, true)
 
         // Morphological Transformations
         val kernelMat = getStructuringElement(MORPH_RECT, Size(5.0, 5.0))
@@ -474,24 +520,73 @@ class MainActivity : AppCompatActivity() {
         val hierarchy = Mat()
         findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
 
-        // find the largest contours and draw it
+        // find the contours and draw it
         var maxArea = -1.0
         var maxIdx = 0
         for ((index, contour) in contours.withIndex()) {
             val contourArea = contourArea(contour)
-            if (contourArea < maxArea) {
+            if (contourArea < 5000.0 ) {
                 continue
             }
-            maxArea = contourArea
-            maxIdx = index
-
+            if (contourArea > maxArea) {
+                maxArea = contourArea
+                maxIdx = index
+            }
         }
         if (maxArea < 0) {
             return null
         }
         val contour = contours[maxIdx]
         val boundRect: Rect = boundingRect(contour)
-        rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(255.0, 0.0, 0.0), 15, 8, 0);
         return contour
+    }
+
+
+    // Process the Top Coin
+    private fun processBackCoin(
+        origMat: Mat,
+        minThreshold: Double = 30.0,
+    ) : MatOfPoint? {
+        // Create a Mat object to hold the image data
+        val imageMat = Mat()
+        var tmpMat = Mat()
+
+        // Convert the input imageBitmap to a Mat object (OpenCV format)
+        Utils.bitmapToMat(imageBitmap, imageMat)
+
+        // Convert BGRA to BGR.
+        cvtColor(imageMat, imageMat, COLOR_BGR2GRAY);
+
+        // Blur to filter the noise
+        blur(imageMat, tmpMat, Size(5.0, 5.0))
+
+        // Call Canny for contour detection
+        Canny(tmpMat, imageMat, minThreshold, minThreshold * 3.0, 3, true)
+
+        // Morphological Transformations
+        val kernelMat = getStructuringElement(MORPH_RECT, Size(5.0, 5.0))
+        dilate(imageMat, imageMat, kernelMat, Point(-1.0, -1.0), 2)
+
+        // find contours
+        val contours = ArrayList<MatOfPoint>()
+        val hierarchy = Mat()
+        findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
+
+        // find the contours and draw it
+        var topY = 100000.0
+        var topIdx = 0
+        for ((index, contour) in contours.withIndex()) {
+            val contourArea = contourArea(contour)
+            if (contourArea < 5000.0 ) {
+                continue
+            }
+            val boundRect: Rect = boundingRect(contour)
+            if (topY > boundRect.y.toDouble()) {
+                topY = boundRect.y.toDouble()
+                topIdx = index
+            }
+            //drawContours(origMat, contours, index, Scalar(0.0, 0.0, 255.0), 15)
+        }
+        return contours[topIdx]
     }
 }
