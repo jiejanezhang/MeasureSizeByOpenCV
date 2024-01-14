@@ -1,6 +1,7 @@
 package com.example.measuresizebyopencv
 
 import android.graphics.Bitmap
+import android.icu.text.DecimalFormat
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -15,6 +16,7 @@ import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc.*
+import java.math.RoundingMode
 import java.util.*
 import kotlin.math.*
 
@@ -38,7 +40,7 @@ class MainActivity : AppCompatActivity() {
     private var contourContainer: MatOfPoint? = null
     private var contourTopCoin: MatOfPoint? = null
     private var contourBackCoin: MatOfPoint? = null
-    private var baseCoinSize = 0
+    private var baseCoinSize = 0.0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -152,15 +154,15 @@ class MainActivity : AppCompatActivity() {
             curveList.add(contourContainer!!)
             drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
         }
-        var topCoinSize = 0
-        var backCoinSize = 0
+        var topCoinSize = 0.0
+        var backCoinSize = 0.0
         if ( contourTopCoin != null) {
             val curveList = ArrayList<MatOfPoint>()
             curveList.add(contourTopCoin!!)
             val boundRect: Rect = boundingRect(contourTopCoin)
             if ((abs(boundRect.width-boundRect.height) <5) && boundRect.width > 150 && boundRect.width <500)
             {
-                topCoinSize = boundRect.width
+                topCoinSize = boundRect.width.toDouble()
                 println("TopCoin: $topCoinSize")
                 rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0);
             }
@@ -170,7 +172,7 @@ class MainActivity : AppCompatActivity() {
             curveList.add(contourBackCoin!!)
             val boundRect: Rect = boundingRect(contourBackCoin)
             if ((abs(boundRect.width-boundRect.height) <5) && boundRect.width > 150 && boundRect.width <500){
-                backCoinSize = boundRect.width
+                backCoinSize = boundRect.width.toDouble()
                 println("BackCoin:$backCoinSize")
                 rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0);
             }
@@ -179,7 +181,13 @@ class MainActivity : AppCompatActivity() {
             baseCoinSize = (topCoinSize + backCoinSize) /2
         }
         else{
-            baseCoinSize = 310 // Based on the data from several photoes
+            if (topCoinSize > 0) {
+                baseCoinSize = 301* ( topCoinSize/388) // Based on the data from several photoes
+            }else if (backCoinSize > 0) {
+                baseCoinSize = 301* (backCoinSize/216) // Based on the data from several photoes
+            }else{
+                baseCoinSize = 301.0 // Based on the data from several photoes
+            }
         }
         println("TopCoin: $topCoinSize   BackCoin:$backCoinSize    BaseCoin:$baseCoinSize")
         showImage(origMat)
@@ -218,8 +226,11 @@ class MainActivity : AppCompatActivity() {
         if (contourTopCoin == null || contourBackCoin == null || contourContainer == null) {
             return
         }
-
         val volume = calculateVolume()
+        val decimalFormat = DecimalFormat("#.##")
+        decimalFormat.roundingMode = RoundingMode.CEILING.ordinal
+        val textViewVolume = findViewById<TextView>(R.id.textViewVolume)
+        textViewVolume.text = decimalFormat.format(volume/1000000).toString() + "L"
     }
 
     private fun calculateVolume(): Double{
