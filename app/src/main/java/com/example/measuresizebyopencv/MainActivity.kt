@@ -172,10 +172,10 @@ class MainActivity : AppCompatActivity() {
         if (contourCoin == null || contourContainer == null) {
             return
         }
-        val volumn = calculateVolumn()
+        val volume = calculateVolume()
     }
 
-    private fun calculateVolumn(): Double{
+    private fun calculateVolume(): Double{
         val origMat = Mat()
         Utils.bitmapToMat(imageBitmap, origMat)
         val boundRect: Rect = boundingRect(contourCoin)
