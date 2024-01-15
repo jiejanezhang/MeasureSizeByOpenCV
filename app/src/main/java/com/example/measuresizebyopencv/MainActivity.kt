@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         // on below line we are initializing our variables.
         seekBarIteration.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                updateImage(updateTopCoin = false)
+                updateImage(updateTopCoin = false, updateBackCoin = false)
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
@@ -142,7 +142,7 @@ class MainActivity : AppCompatActivity() {
             contourContainer = processContainer(origMat, minThreshold, radioButton.text as String)
         }
         if (updateTopCoin) {
-            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 40.0, 100.0)
+            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 0.0, 100.0)
             contourTopCoin = processTopCoin(origMat, minThreshold)
         }
         if (updateBackCoin) {
@@ -160,21 +160,22 @@ class MainActivity : AppCompatActivity() {
             val curveList = ArrayList<MatOfPoint>()
             curveList.add(contourTopCoin!!)
             val boundRect: Rect = boundingRect(contourTopCoin)
-            if ((abs(boundRect.width-boundRect.height) <5) && boundRect.width > 150 && boundRect.width <500)
+            println("TopCoin: width: ${boundRect.width}    height: ${boundRect.height}")
+            if ((abs(boundRect.width-boundRect.height) <20) && boundRect.width > 150 && boundRect.width <500)
             {
                 topCoinSize = boundRect.width.toDouble()
+                rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0)
                 println("TopCoin: $topCoinSize")
-                rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0);
             }
         }
         if ( contourBackCoin != null) {
             val curveList = ArrayList<MatOfPoint>()
             curveList.add(contourBackCoin!!)
             val boundRect: Rect = boundingRect(contourBackCoin)
-            if ((abs(boundRect.width-boundRect.height) <5) && boundRect.width > 150 && boundRect.width <500){
+            if ((abs(boundRect.width-boundRect.height) <20) && boundRect.width > 150 && boundRect.width <500){
                 backCoinSize = boundRect.width.toDouble()
-                println("BackCoin:$backCoinSize")
                 rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0);
+                println("BackCoin:$backCoinSize")
             }
         }
         if (topCoinSize >0 && backCoinSize >0 ) {
@@ -207,6 +208,8 @@ class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.P)
     fun onCaptureOrSelectImageClick(view: View) {
         imagePickerResult.launch("image/*")
+        val textViewVolume = findViewById<TextView>(R.id.textViewVolume)
+        textViewVolume.text = "Volume:?"
     }
 
     @RequiresApi(Build.VERSION_CODES.P)
@@ -223,7 +226,7 @@ class MainActivity : AppCompatActivity() {
     // Button click handler to capture or select an image
     @RequiresApi(Build.VERSION_CODES.P)
     fun onStartToMeasureSizeClick(view: View) {
-        if (contourTopCoin == null || contourBackCoin == null || contourContainer == null) {
+        if (contourContainer == null) {
             return
         }
         val volume = calculateVolume()
@@ -335,7 +338,6 @@ class MainActivity : AppCompatActivity() {
 
         // Find the binding box Rect of approx Poly DP
         val boundRect: Rect = boundingRect(contour)
-        rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(255.0, 0.0, 255.0), 5, 8, 0);
         println("Bounding Box tl: [${boundRect.tl().x} ${boundRect.tl().y}]   br: [${boundRect.br().x} ${boundRect.br().y}]")
 
         // Judge the bounding points
