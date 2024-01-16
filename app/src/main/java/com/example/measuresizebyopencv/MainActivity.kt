@@ -36,6 +36,8 @@ class MainActivity : AppCompatActivity() {
     private var imageBitmap: Bitmap? = null
     private var contourContainer: MatOfPoint? = null
     private var contourCoin: MatOfPoint? = null
+    private var coinSize: Double = 0.0
+    private var coinCenter: Point? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,17 +126,15 @@ class MainActivity : AppCompatActivity() {
         }
         if (updateCoin) {
             val minThreshold2 = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 0.0, 100.0)
-            contourCoin = processCoin(origMat, minThreshold2)
+            processCoin(origMat, minThreshold2)
         }
         if ( updateContainer && contourContainer != null) {
             val curveList = ArrayList<MatOfPoint>()
             curveList.add(contourContainer!!)
             drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
         }
-        if ( contourCoin != null) {
-            val curveList = ArrayList<MatOfPoint>()
-            curveList.add(contourCoin!!)
-            drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
+        if ( coinSize > 0.0 ) {
+            circle(origMat, coinCenter, (coinSize/2).toInt(), Scalar(255.0, 0.0, 0.0), 11 )
         }
         showImage(origMat)
     }
@@ -357,13 +357,11 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-
-    // Process the captured or selected image with OpenCV and display the result
+    // Process the coin
     private fun processCoin(
         origMat: Mat,
-        minThreshold2: Double = 30.0,
-        filterOption: String = "None"
-    ) : MatOfPoint? {
+        minThreshold: Double = 30.0
+    ) {
         // Create a Mat object to hold the image data
         val imageMat = Mat()
         var tmpMat = Mat()
@@ -378,35 +376,81 @@ class MainActivity : AppCompatActivity() {
         blur(imageMat, tmpMat, Size(5.0, 5.0))
 
         // Call Canny for contour detection
-        Canny(tmpMat, imageMat, minThreshold2, minThreshold2 * 3.0, 3, true)
+        Canny(tmpMat, imageMat, minThreshold, minThreshold * 3.0, 3, true)
 
         // Morphological Transformations
         val kernelMat = getStructuringElement(MORPH_RECT, Size(5.0, 5.0))
         dilate(imageMat, imageMat, kernelMat, Point(-1.0, -1.0), 2)
 
+        showImage(imageMat)
         // find contours
-        val contours = ArrayList<MatOfPoint>()
+        val contours = java.util.ArrayList<MatOfPoint>()
         val hierarchy = Mat()
         findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
 
-        // find the largest contours and draw it
+        var containerBound: Rect? = null
+        if (contourContainer != null) {
+            containerBound = boundingRect(contourContainer)
+        }
+        // find the contours and draw it
         var maxArea = -1.0
-        var maxIdx = 0
+        var maxIdx = -1
         for ((index, contour) in contours.withIndex()) {
             val contourArea = contourArea(contour)
-            if (contourArea < maxArea) {
+
+            // Skip the small contour
+            if (contourArea < 10000.0 ) {
                 continue
             }
-            maxArea = contourArea
-            maxIdx = index
+            // There should be at least 5 points to fit the ellipse
+            if (contour.toList().size < 5) {
+                println("Skip the <5 points.")
+                continue
+            }
+
+
+            // Skip the very narrow area or too long area
+            val boundRect: Rect = boundingRect(contour)
+            var longEdge = boundRect.height.toFloat()
+            var shortEdge = boundRect.width.toFloat()
+            if (boundRect.width > boundRect.height) {
+                longEdge = boundRect.width.toFloat()
+                shortEdge = boundRect.height.toFloat()
+            }
+            if (((longEdge/shortEdge) > 6.0) || longEdge < 100 || longEdge > 800){
+                println("Skip the very narrow area or too long area. LongEdge: $longEdge   shortEdge: $shortEdge")
+                continue
+            }
+            //drawContours(origMat, contours, index, Scalar(255.0, 255.0, 0.0), 5)
+
+            // Coin is on the container. Skip if out of container.
+            if (containerBound != null) {
+                if (boundRect.x < containerBound.x || boundRect.x > containerBound.x + containerBound.width
+                    || boundRect.y < containerBound.y || boundRect.y > containerBound.y + containerBound.height)
+                    continue
+            }
+            if (contourArea > maxArea) {
+                maxArea = contourArea
+                maxIdx = index
+            }
 
         }
-        if (maxArea < 0) {
-            return null
+        if (maxIdx < 0 ) {
+            return
         }
-        val contour = contours[maxIdx]
-        val boundRect: Rect = boundingRect(contour)
-        rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(255.0, 0.0, 0.0), 15, 8, 0);
-        return contour
+
+        // Find the fit Ellipse
+        val contour :MatOfPoint = contours[maxIdx]
+        drawContours(origMat, contours, maxIdx , Scalar(255.0, 255.0, 0.0), 5)
+        val contour2f = MatOfPoint2f()
+        contour.convertTo(contour2f, CvType.CV_32FC2)
+        var elli = fitEllipse(contour2f)
+        var center: Point = elli.center
+        var radius: Double = if (elli.size.width < elli.size.height) elli.size.width/2 else elli.size.height/2
+        ellipse(origMat, elli, Scalar(0.0, 255.0, 0.0), 3)
+        coinSize = radius * 2
+        coinCenter = center
+        return
     }
+
 }
