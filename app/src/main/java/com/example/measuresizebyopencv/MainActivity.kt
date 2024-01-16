@@ -1,6 +1,7 @@
 package com.example.measuresizebyopencv
 
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.icu.text.DecimalFormat
 import android.os.Build
 import android.os.Bundle
@@ -38,9 +39,10 @@ class MainActivity : AppCompatActivity() {
 
     private var imageBitmap: Bitmap? = null
     private var contourContainer: MatOfPoint? = null
-    private var contourTopCoin: MatOfPoint? = null
-    private var contourBackCoin: MatOfPoint? = null
-    private var baseCoinSize = 0.0
+    private var topCoinSize: Double = 0.0
+    private var topCoinCenter: Point? = null
+    private var backCoinSize: Double = 0.0
+    private var backCoinCenter: Point? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -143,54 +145,27 @@ class MainActivity : AppCompatActivity() {
         }
         if (updateTopCoin) {
             val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 0.0, 100.0)
-            contourTopCoin = processTopCoin(origMat, minThreshold)
+            processCoin(origMat, minThreshold, topCoin = true)
         }
         if (updateBackCoin) {
             val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin3.progress, 0.0, 40.0)
-            contourBackCoin = processBackCoin(origMat, minThreshold)
+            processCoin(origMat, minThreshold, topCoin = false)
         }
+
         if ( contourContainer != null) {
             val curveList = ArrayList<MatOfPoint>()
             curveList.add(contourContainer!!)
             drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
         }
-        var topCoinSize = 0.0
-        var backCoinSize = 0.0
-        if ( contourTopCoin != null) {
-            val curveList = ArrayList<MatOfPoint>()
-            curveList.add(contourTopCoin!!)
-            val boundRect: Rect = boundingRect(contourTopCoin)
-            println("TopCoin: width: ${boundRect.width}    height: ${boundRect.height}")
-            if ((abs(boundRect.width-boundRect.height) <20) && boundRect.width > 150 && boundRect.width <500)
-            {
-                topCoinSize = boundRect.width.toDouble()
-                rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0)
-                println("TopCoin: $topCoinSize")
-            }
+
+        if (topCoinSize > 0.0) {
+            circle(origMat, topCoinCenter, (topCoinSize/2).toInt(), Scalar(255.0, 255.0, 0.0), 11)
         }
-        if ( contourBackCoin != null) {
-            val curveList = ArrayList<MatOfPoint>()
-            curveList.add(contourBackCoin!!)
-            val boundRect: Rect = boundingRect(contourBackCoin)
-            if ((abs(boundRect.width-boundRect.height) <20) && boundRect.width > 150 && boundRect.width <500){
-                backCoinSize = boundRect.width.toDouble()
-                rectangle(origMat, boundRect.tl(), boundRect.br(), Scalar(0.0, 255.0, 255.0), 11, 8, 0);
-                println("BackCoin:$backCoinSize")
-            }
+
+        if (backCoinSize > 0.0) {
+            circle(origMat, backCoinCenter, (backCoinSize/2).toInt(), Scalar(0.0, 255.0, 255.0), 11)
         }
-        if (topCoinSize >0 && backCoinSize >0 ) {
-            baseCoinSize = (topCoinSize + backCoinSize) /2
-        }
-        else{
-            if (topCoinSize > 0) {
-                baseCoinSize = 301* ( topCoinSize/388) // Based on the data from several photoes
-            }else if (backCoinSize > 0) {
-                baseCoinSize = 301* (backCoinSize/216) // Based on the data from several photoes
-            }else{
-                baseCoinSize = 301.0 // Based on the data from several photoes
-            }
-        }
-        println("TopCoin: $topCoinSize   BackCoin:$backCoinSize    BaseCoin:$baseCoinSize")
+
         showImage(origMat)
     }
 
@@ -280,31 +255,42 @@ class MainActivity : AppCompatActivity() {
         val maxY = (vectorList[vectorList.size-1][1].y).toInt()
         val minY = (vectorList[0][0].y).toInt()
         var volume = 0.0
-        val sliceHeight = 20
+        val sliceHeight = 50
         for (y in minY..maxY step sliceHeight)
         {
-            //println("Scan Y: $y")
+            println("Scan Y: $y")
             val jointPoints : MutableList<Point> = mutableListOf()
             for ( vector in vectorList){
                 if ( y >= vector[0].y && y <= vector[1].y ) {
-                    //println("Vector: [${vector[0].x}, ${vector[0].y}] -> [${vector[1].x}, ${vector[1].y}]")
                     // x = x1 + (y-y1)(x1-x2)/(y1-y2)
                     val x = vector[0].x + (y - vector[0].y)*(vector[0].x - vector[1].x)/(vector[0].y - vector[1].y)
                     jointPoints.add(Point(x, y.toDouble()))
-                    //println("Joint Point:$x, ${y.toDouble()}")
                 }
             }
-            //println("Joint Points Number: ${jointPoints.size}")
             if ( jointPoints.size >= 2) {
                 line(origMat, jointPoints[0], jointPoints[1], Scalar(0.0, 0.0, 255.0), 9)
+                println("Joint Points:${jointPoints[0]}, ${jointPoints[1]}")
                 // Volume = pi*r²*h
                 volume += sliceHeight * PI * abs(jointPoints[0].x - jointPoints[1].x).pow(2) / 4
             }
         }
         showImage(origMat)
 
-        val baseMeter = baseCoinSize / 22.25 // 像素长度/mm
-        volume /= baseMeter.pow(3)
+        var baseCoinSize : Double
+        if (topCoinSize >0 && backCoinSize >0 ) {
+            baseCoinSize = 2 * topCoinSize * backCoinSize/(topCoinSize + backCoinSize)
+        }
+        else{
+            if (topCoinSize > 0) {
+                baseCoinSize = 2 * topCoinSize * 216/(topCoinSize + 216) // Based on the data from several photoes
+            }else if (backCoinSize > 0) {
+                baseCoinSize = 2 * 388 * backCoinSize/(388 + backCoinSize) // Based on the data from several photoes
+            }else{
+                baseCoinSize = 301.0 // Based on the data from several photoes
+            }
+        }
+        val imageMeter = baseCoinSize / 22.25 // 像素长度/mm
+        volume /= imageMeter.pow(3)
 
         println("Volume: $volume")
         return volume
@@ -502,12 +488,21 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    // Process the Top Coin
-    private fun processTopCoin(
+    // Process the coin
+    private fun processCoin(
         origMat: Mat,
         minThreshold: Double = 30.0,
-        filterOption: String = "None"
-    ) : MatOfPoint? {
+        topCoin: Boolean = true
+    ) {
+        // Initialize the coin data.
+        if (topCoin) {
+            topCoinSize = 0.0
+            topCoinCenter = null
+        }else{
+            backCoinSize = 0.0
+            backCoinCenter = null
+        }
+
         // Create a Mat object to hold the image data
         val imageMat = Mat()
         var tmpMat = Mat()
@@ -528,33 +523,108 @@ class MainActivity : AppCompatActivity() {
         val kernelMat = getStructuringElement(MORPH_RECT, Size(5.0, 5.0))
         dilate(imageMat, imageMat, kernelMat, Point(-1.0, -1.0), 2)
 
+        showImage(imageMat)
         // find contours
         val contours = ArrayList<MatOfPoint>()
         val hierarchy = Mat()
         findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
 
+        var containerBound: Rect? = null
+        if (contourContainer != null) {
+            containerBound = boundingRect(contourContainer)
+        }
         // find the contours and draw it
         var maxArea = -1.0
-        var maxIdx = 0
+        var maxIdx = -1
+        var topY = 100000.0
+        var topIdx = -1
         for ((index, contour) in contours.withIndex()) {
             val contourArea = contourArea(contour)
-            if (contourArea < 5000.0 ) {
+
+            // Skip the small contour
+            if (contourArea < 10000.0 ) {
                 continue
             }
-            if (contourArea > maxArea) {
-                maxArea = contourArea
-                maxIdx = index
+            // There should be at least 5 points to fit the ellipse
+            if (contour.toList().size < 5) {
+                println("Skip the <5 points.")
+                continue
             }
+
+
+            // Skip the very narrow area or too long area
+            val boundRect: Rect = boundingRect(contour)
+            var longEdge = boundRect.height.toFloat()
+            var shortEdge = boundRect.width.toFloat()
+            if (boundRect.width > boundRect.height) {
+                longEdge = boundRect.width.toFloat()
+                shortEdge = boundRect.height.toFloat()
+            }
+            if (((longEdge/shortEdge) > 6.0) || longEdge < 100 || longEdge > 800){
+                println("Skip the very narrow area or too long area. LongEdge: $longEdge   shortEdge: $shortEdge")
+                continue
+            }
+            //drawContours(origMat, contours, index, Scalar(255.0, 255.0, 0.0), 5)
+
+            if (topCoin)
+            {
+                // Top coin is on the container. Skip if out of container.
+                if (containerBound != null) {
+                    if (boundRect.x < containerBound.x || boundRect.x > containerBound.x + containerBound.width
+                        || boundRect.y < containerBound.y || boundRect.y > containerBound.y + containerBound.height)
+                        continue
+                }
+                if (contourArea > maxArea) {
+                    maxArea = contourArea
+                    maxIdx = index
+                }
+            }
+            else{
+                // Back coin is out of the container. Skip if it is in the container.
+                if (containerBound != null) {
+                    if (boundRect.x > containerBound.x && boundRect.x < containerBound.x + containerBound.width
+                        && boundRect.y > containerBound.y && boundRect.y < containerBound.y + containerBound.height)
+                       continue
+                }
+                if (topY > boundRect.y.toDouble()) {
+                    topY = boundRect.y.toDouble()
+                    topIdx = index
+                }
+            }
+
         }
-        if (maxArea < 0) {
-            return null
+        if (maxIdx < 0 && topCoin) {
+            return
         }
-        val contour = contours[maxIdx]
+        if (topIdx < 0 && !topCoin) {
+            return
+        }
+
+        // Find the fit Ellipse
+        val contour :MatOfPoint = if (topCoin) contours[maxIdx]  else contours[topIdx]
+        drawContours(origMat, contours, if (topCoin) maxIdx  else topIdx, Scalar(255.0, 255.0, 0.0), 5)
+        val contour2f = MatOfPoint2f()
+        contour.convertTo(contour2f, CvType.CV_32FC2)
+        var elli = fitEllipse(contour2f)
+        var center: Point = elli.center
+        var radius: Double = if (elli.size.width < elli.size.height) elli.size.width/2 else elli.size.height/2
+
+/*        // Check if the contour is outside of ellipse by 10%, and skip if yes.
         val boundRect: Rect = boundingRect(contour)
-        return contour
+        if ( boundRect.width.toDouble() > radius * 2 * 1.1 || boundRect.height.toDouble() > radius * 2 * 1.1 )
+            return*/
+
+        if (topCoin) {
+            topCoinSize = radius * 2
+            topCoinCenter = center
+        } else {
+            backCoinSize = radius * 2
+            backCoinCenter = center
+        }
+        return
     }
 
-
+/*
     // Process the Top Coin
     private fun processBackCoin(
         origMat: Mat,
@@ -601,5 +671,5 @@ class MainActivity : AppCompatActivity() {
             //drawContours(origMat, contours, index, Scalar(0.0, 0.0, 255.0), 15)
         }
         return contours[topIdx]
-    }
+    }*/
 }
