@@ -1,34 +1,22 @@
 package com.example.measuresizebyopencv
 
-//import com.google.common.primitives.Bytes
-import android.annotation.SuppressLint
-import android.app.AlertDialog
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothManager
-import android.bluetooth.BluetoothSocket
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.icu.text.DecimalFormat
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import android.util.Log
+import android.telecom.Call.Details
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
-import kotlinx.coroutines.*
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc.*
-import java.io.IOException
 import java.math.RoundingMode
 import java.util.*
 import kotlin.math.*
@@ -39,9 +27,6 @@ enum class ANGLE {
     ANGLE_BARELY_SHARP, // 65°~90°
     ANGLE_OTHER
 }
-const val MESSAGE_READ: Int = 0
-const val MESSAGE_WRITE: Int = 1
-const val MESSAGE_TOAST: Int = 2
 class MainActivity : AppCompatActivity() {
 
     private lateinit var imageView: ImageView
@@ -58,19 +43,6 @@ class MainActivity : AppCompatActivity() {
     private var topCoinCenter: Point? = null
     private var backCoinSize: Double = 0.0
     private var backCoinCenter: Point? = null
-    private var volume: Double = 2.0
-
-    private lateinit var bluetoothAdapter: BluetoothAdapter
-
-    companion object {
-        private const val REQUEST_ENABLE_BT = 1
-        private const val BLUETOOTH_PERMISSION_CODE = 100
-        private const val TAG = "MY_APP_DEBUG_TAG"
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,7 +58,6 @@ class MainActivity : AppCompatActivity() {
 
         // Initialize OpenCV
         OpenCVLoader.initDebug()
-
 
         // on below line we are initializing our variables.
         seekBarIteration.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -156,165 +127,9 @@ class MainActivity : AppCompatActivity() {
                 updateImage()
             }
         }
+
+
         )
-
-    }
-
-    private fun mapSeekBarProgressToValue(
-        progress: Int,
-        minValue: Double,
-        maxValue: Double
-    ): Double {
-        val range = maxValue - minValue
-        return minValue + (progress / 100.0) * range
-    }
-
-    // Button click handler to capture or select an image
-    @RequiresApi(Build.VERSION_CODES.P)
-    fun onCaptureOrSelectImageClick(view: View) {
-        imagePickerResult.launch("image/*")
-        val textViewVolume = findViewById<TextView>(R.id.textViewVolume)
-        textViewVolume.text = "Volume:?"
-        volume = 0.0
-    }
-
-    @RequiresApi(Build.VERSION_CODES.P)
-    private val imagePickerResult =
-        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let {
-                imageBitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
-
-                updateImage()
-            }
-        }
-
-    // Button click handler to capture or select an image
-    @RequiresApi(Build.VERSION_CODES.P)
-    fun onStartToMeasureSizeClick(view: View) {
-        if (contourContainer == null) {
-            return
-        }
-        volume = calculateVolume()/1000000
-        val decimalFormat = DecimalFormat("#.##")
-        decimalFormat.roundingMode = RoundingMode.CEILING.ordinal
-        val textViewVolume = findViewById<TextView>(R.id.textViewVolume)
-        textViewVolume.text = decimalFormat.format(volume).toString() + "L"
-    }
-
-
-/*    @SuppressLint("MissingPermission")
-    @RequiresApi(Build.VERSION_CODES.M)
-    //https://developer.android.com/develop/connectivity/bluetooth/connect-bluetooth-devices
-    //https://developer.android.com/develop/connectivity/bluetooth/transfer-data
-    private inner class ConnectThread(device: BluetoothDevice, private val containerName: String) : Thread() {
-
-        private val mmSocket: BluetoothSocket? by lazy(LazyThreadSafetyMode.NONE) {
-            device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-        }
-        private fun cancel() {
-            try {
-                mmSocket!!.close()
-            } catch (e: IOException) {
-            }
-        }
-        public override fun run() {
-            // Cancel discovery because it otherwise slows down the connection.
-            //bluetoothAdapter?.cancelDiscovery()
-
-            mmSocket?.use { socket ->
-                // Connect to the remote device through the socket. This call blocks
-                // until it succeeds or throws an exception.
-                var data = containerName + "(" + volume.toString() + "L)"
-                try {
-                    socket.connect()
-                    // The connection attempt succeeded. Perform work associated with
-                    // the connection.
-                    Log.v("BT", "BT connected.")
-                    var outputStream = socket.outputStream
-                    val byteArray = data.toByteArray()
-                    outputStream.write(byteArray)
-                    Log.v("BT", "Data is sent.")
-                    sleep(500)
-                    //outputStream.close()
-                } catch (e: IOException) {
-                    Log.e("BT", "Connect or send data error", e)
-                }
-                //Toast.makeText(this@MainActivity, data + "已记录。", Toast.LENGTH_SHORT).show()
-            }
-
-        }
-
-    }*/
-
-    @SuppressLint("MissingPermission")
-    @RequiresApi(Build.VERSION_CODES.P)
-    fun onToRegisterContainerClick(view: View) {
-        if (volume == 0.0){
-            Toast.makeText(this@MainActivity, "Volume is zero", Toast.LENGTH_SHORT).show()
-            return
-        }
-        bluetoothAdapter = getSystemService(BluetoothManager::class.java).adapter
-
-        if (bluetoothAdapter == null) {
-            Toast.makeText(this@MainActivity, "没有蓝牙功能。", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (bluetoothAdapter?.isEnabled == false) {
-            Toast.makeText(this@MainActivity, "蓝牙功能未打开。", Toast.LENGTH_SHORT).show()
-            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
-            return
-        }
-
-        // Search the Paied device list for "Faucet_Controller".
-        val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter?.bondedDevices
-        var BTdevice : BluetoothDevice? = null
-        val DEVNAME = "Faucet_Controller"
-
-        pairedDevices?.forEach { device ->
-            if (device.name == DEVNAME) {
-                BTdevice = device
-            }
-        }
-        if (BTdevice == null ) {
-            Toast.makeText(this@MainActivity, DEVNAME+ " is not paired.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        // To popup dialog for container name
-        val builder = AlertDialog.Builder(this)
-        val inflater = layoutInflater
-        builder.setTitle("Input Container Name:")
-        val dialogLayout = inflater.inflate(R.layout.alert_dialog_with_edittext, null)
-        val editText  = dialogLayout.findViewById<EditText>(R.id.editText)
-        builder.setView(dialogLayout)
-
-        var data = ""
-        val decimalFormat = DecimalFormat("#.##")
-        decimalFormat.roundingMode = RoundingMode.CEILING.ordinal
-        val volume_data = decimalFormat.format(volume).toString()
-        builder.setPositiveButton("OK") { _, _ ->
-            data = editText.text.toString() + "(" + volume_data + "L)"
-            var BTSocket = BTdevice!!.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-
-            try {
-                BTSocket.connect()
-                // The connection attempt succeeded. Perform work associated with
-                // the connection.
-                Log.v("BT", "BT connected.")
-                var outputStream = BTSocket.outputStream
-                val byteArray = data.toByteArray()
-                outputStream.write(byteArray)
-                Log.v("BT", "Data is sent.")
-                Toast.makeText(this@MainActivity, data +" is Registered.", Toast.LENGTH_SHORT).show()
-            } catch (e: IOException) {
-                Log.e("BT", "Connect or send data error", e)
-                Toast.makeText(this@MainActivity, "Connect or send data error. Please try again.", Toast.LENGTH_SHORT).show()
-            }
-        }
-        builder.setNegativeButton("Cancel"){ _, _ ->Toast.makeText(this@MainActivity, "Skip register the container.", Toast.LENGTH_SHORT).show() }
-        builder.show()
-
     }
 
     private fun updateImage(updateContainer: Boolean = true, updateTopCoin: Boolean = true, updateBackCoin: Boolean = true) {
@@ -344,7 +159,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (topCoinSize > 0.0) {
-            circle(origMat, topCoinCenter, (topCoinSize/2).toInt(), Scalar(255.0, 0.0, 0.0), 11)
+            circle(origMat, topCoinCenter, (topCoinSize/2).toInt(), Scalar(255.0, 255.0, 0.0), 11)
         }
 
         if (backCoinSize > 0.0) {
@@ -355,6 +170,46 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    private fun mapSeekBarProgressToValue(
+        progress: Int,
+        minValue: Double,
+        maxValue: Double
+    ): Double {
+        val range = maxValue - minValue
+        return minValue + (progress / 100.0) * range
+    }
+
+    // Button click handler to capture or select an image
+    @RequiresApi(Build.VERSION_CODES.P)
+    fun onCaptureOrSelectImageClick(view: View) {
+        imagePickerResult.launch("image/*")
+        val textViewVolume = findViewById<TextView>(R.id.textViewVolume)
+        textViewVolume.text = "Volume:?"
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private val imagePickerResult =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let {
+                imageBitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
+
+                updateImage()
+            }
+        }
+
+
+    // Button click handler to capture or select an image
+    @RequiresApi(Build.VERSION_CODES.P)
+    fun onStartToMeasureSizeClick(view: View) {
+        if (contourContainer == null) {
+            return
+        }
+        val volume = calculateVolume()
+        val decimalFormat = DecimalFormat("#.##")
+        decimalFormat.roundingMode = RoundingMode.CEILING.ordinal
+        val textViewVolume = findViewById<TextView>(R.id.textViewVolume)
+        textViewVolume.text = decimalFormat.format(volume/1000000).toString() + "L"
+    }
 
     private fun calculateVolume(): Double{
         val origMat = Mat()
@@ -434,7 +289,6 @@ class MainActivity : AppCompatActivity() {
                 baseCoinSize = 301.0 // Based on the data from several photoes
             }
         }
-
         val imageMeter = baseCoinSize / 22.25 // 像素长度/mm
         volume /= imageMeter.pow(3)
 
@@ -748,13 +602,17 @@ class MainActivity : AppCompatActivity() {
 
         // Find the fit Ellipse
         val contour :MatOfPoint = if (topCoin) contours[maxIdx]  else contours[topIdx]
-        //drawContours(origMat, contours, if (topCoin) maxIdx  else topIdx, Scalar(255.0, 255.0, 0.0), 5)
+        drawContours(origMat, contours, if (topCoin) maxIdx  else topIdx, Scalar(255.0, 255.0, 0.0), 5)
         val contour2f = MatOfPoint2f()
         contour.convertTo(contour2f, CvType.CV_32FC2)
         var elli = fitEllipse(contour2f)
         var center: Point = elli.center
         var radius: Double = if (elli.size.width < elli.size.height) elli.size.width/2 else elli.size.height/2
 
+/*        // Check if the contour is outside of ellipse by 10%, and skip if yes.
+        val boundRect: Rect = boundingRect(contour)
+        if ( boundRect.width.toDouble() > radius * 2 * 1.1 || boundRect.height.toDouble() > radius * 2 * 1.1 )
+            return*/
 
         if (topCoin) {
             topCoinSize = radius * 2

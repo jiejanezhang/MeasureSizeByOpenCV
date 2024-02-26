@@ -150,13 +150,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:onClick="onStartToMeasureSizeClick"
-        android:text="To Measure Volume" />
-
-    <Button
-        android:id="@+id/button2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:onClick="onToRegisterContainerClick"
-        android:text="To Register Container" />
+        android:text="Start to Measure Size" />
 
 </LinearLayout>
