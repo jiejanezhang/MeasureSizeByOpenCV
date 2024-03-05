@@ -13,7 +13,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:onClick="onCaptureOrSelectImageClick"
-        android:text="Select Image" />
+        android:text="选择照片" />
 
     <ImageView
         android:id="@+id/imageView"
@@ -79,13 +79,13 @@
         android:id="@+id/textViewVolume"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Volume:?" />
+        android:text="容量:未知" />
 
     <TextView
         android:id="@+id/textView2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Iteration number: 1~5"
+        android:text="迭代次数: 1~5"
         android:visibility="visible" />
 
     <SeekBar
@@ -101,7 +101,7 @@
         android:id="@+id/textView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Container Thresholder:"
+        android:text="容器轮廓识别参数调节:"
         android:visibility="visible" />
 
     <SeekBar
@@ -116,7 +116,7 @@
         android:id="@+id/textView3"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Top Coin Thresholder:"
+        android:text="近处参照物识别参数调节:"
         android:visibility="visible" />
 
     <SeekBar
@@ -131,7 +131,7 @@
         android:id="@+id/textView4"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Back Coin Thresholder:" />
+        android:text="远处参照物识别参数调节:" />
 
     <SeekBar
         android:id="@+id/seekBarThresholdMin3"
@@ -150,13 +150,13 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:onClick="onStartToMeasureSizeClick"
-        android:text="To Measure Volume" />
+        android:text="计算容量" />
 
     <Button
         android:id="@+id/button2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:onClick="onToRegisterContainerClick"
-        android:text="To Register Container" />
+        android:onClick="onOKToAddClick"
+        android:text="创建容器记录" />
 
 </LinearLayout>

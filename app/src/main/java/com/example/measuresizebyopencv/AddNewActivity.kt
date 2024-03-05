@@ -6,11 +6,7 @@ import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
-import android.bluetooth.BluetoothSocket
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.icu.text.DecimalFormat
 import android.os.Build
@@ -39,10 +35,8 @@ enum class ANGLE {
     ANGLE_BARELY_SHARP, // 65°~90°
     ANGLE_OTHER
 }
-const val MESSAGE_READ: Int = 0
-const val MESSAGE_WRITE: Int = 1
-const val MESSAGE_TOAST: Int = 2
-class MainActivity : AppCompatActivity() {
+
+class AddNewActivity : AppCompatActivity() {
 
     private lateinit var imageView: ImageView
     private lateinit var seekbarThresholdMin: SeekBar
@@ -201,83 +195,12 @@ class MainActivity : AppCompatActivity() {
         textViewVolume.text = decimalFormat.format(volume).toString() + "L"
     }
 
-
-/*    @SuppressLint("MissingPermission")
-    @RequiresApi(Build.VERSION_CODES.M)
-    //https://developer.android.com/develop/connectivity/bluetooth/connect-bluetooth-devices
-    //https://developer.android.com/develop/connectivity/bluetooth/transfer-data
-    private inner class ConnectThread(device: BluetoothDevice, private val containerName: String) : Thread() {
-
-        private val mmSocket: BluetoothSocket? by lazy(LazyThreadSafetyMode.NONE) {
-            device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-        }
-        private fun cancel() {
-            try {
-                mmSocket!!.close()
-            } catch (e: IOException) {
-            }
-        }
-        public override fun run() {
-            // Cancel discovery because it otherwise slows down the connection.
-            //bluetoothAdapter?.cancelDiscovery()
-
-            mmSocket?.use { socket ->
-                // Connect to the remote device through the socket. This call blocks
-                // until it succeeds or throws an exception.
-                var data = containerName + "(" + volume.toString() + "L)"
-                try {
-                    socket.connect()
-                    // The connection attempt succeeded. Perform work associated with
-                    // the connection.
-                    Log.v("BT", "BT connected.")
-                    var outputStream = socket.outputStream
-                    val byteArray = data.toByteArray()
-                    outputStream.write(byteArray)
-                    Log.v("BT", "Data is sent.")
-                    sleep(500)
-                    //outputStream.close()
-                } catch (e: IOException) {
-                    Log.e("BT", "Connect or send data error", e)
-                }
-                //Toast.makeText(this@MainActivity, data + "已记录。", Toast.LENGTH_SHORT).show()
-            }
-
-        }
-
-    }*/
-
     @SuppressLint("MissingPermission")
     @RequiresApi(Build.VERSION_CODES.P)
-    fun onToRegisterContainerClick(view: View) {
+    fun onOKToAddClick(view: View) {
+        volume = 2.1
         if (volume == 0.0){
-            Toast.makeText(this@MainActivity, "Volume is zero", Toast.LENGTH_SHORT).show()
-            return
-        }
-        bluetoothAdapter = getSystemService(BluetoothManager::class.java).adapter
-
-        if (bluetoothAdapter == null) {
-            Toast.makeText(this@MainActivity, "没有蓝牙功能。", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (bluetoothAdapter?.isEnabled == false) {
-            Toast.makeText(this@MainActivity, "蓝牙功能未打开。", Toast.LENGTH_SHORT).show()
-            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
-            return
-        }
-
-        // Search the Paied device list for "Faucet_Controller".
-        val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter?.bondedDevices
-        var BTdevice : BluetoothDevice? = null
-        val DEVNAME = "Faucet_Controller"
-
-        pairedDevices?.forEach { device ->
-            if (device.name == DEVNAME) {
-                BTdevice = device
-            }
-        }
-        if (BTdevice == null ) {
-            Toast.makeText(this@MainActivity, DEVNAME+ " is not paired.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@AddNewActivity, "Volume is zero", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -294,25 +217,18 @@ class MainActivity : AppCompatActivity() {
         decimalFormat.roundingMode = RoundingMode.CEILING.ordinal
         val volume_data = decimalFormat.format(volume).toString()
         builder.setPositiveButton("OK") { _, _ ->
+            val intent = Intent()
             data = editText.text.toString() + "(" + volume_data + "L)"
-            var BTSocket = BTdevice!!.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-
-            try {
-                BTSocket.connect()
-                // The connection attempt succeeded. Perform work associated with
-                // the connection.
-                Log.v("BT", "BT connected.")
-                var outputStream = BTSocket.outputStream
-                val byteArray = data.toByteArray()
-                outputStream.write(byteArray)
-                Log.v("BT", "Data is sent.")
-                Toast.makeText(this@MainActivity, data +" is Registered.", Toast.LENGTH_SHORT).show()
-            } catch (e: IOException) {
-                Log.e("BT", "Connect or send data error", e)
-                Toast.makeText(this@MainActivity, "Connect or send data error. Please try again.", Toast.LENGTH_SHORT).show()
-            }
+            intent.putExtra("infor", data)
+            setResult(MainmenuActivity.NEW_CONTAINER, intent)
+            finish()
         }
-        builder.setNegativeButton("Cancel"){ _, _ ->Toast.makeText(this@MainActivity, "Skip register the container.", Toast.LENGTH_SHORT).show() }
+        builder.setNegativeButton("Cancel"){ _, _ ->
+            val intent = Intent()
+            intent.putExtra("infor", data)
+            setResult(MainmenuActivity.NEW_CONTAINER, intent)
+            finish()
+        }
         builder.show()
 
     }
