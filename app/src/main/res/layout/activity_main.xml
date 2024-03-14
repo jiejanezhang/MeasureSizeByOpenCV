@@ -79,14 +79,26 @@
         android:id="@+id/textViewVolume"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="容量:未知" />
+        android:layout_marginBottom="3dp"
+        android:text="容量:未知"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <View
+        android:id="@+id/divider2"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="3dp"
+        android:layout_marginBottom="5dp"
+        android:background="?android:attr/listDivider"
+        android:textAlignment="gravity" />
 
     <TextView
         android:id="@+id/textView2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="迭代次数: 1~5"
-        android:visibility="visible" />
+        android:visibility="gone" />
 
     <SeekBar
         android:id="@+id/seekBarIteration"
@@ -95,7 +107,7 @@
         android:layout_height="wrap_content"
         android:max="4"
         android:progress="0"
-        android:visibility="visible" />
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/textView"
@@ -116,7 +128,7 @@
         android:id="@+id/textView3"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="近处参照物识别参数调节:"
+        android:text="近处硬币识别参数调节:"
         android:visibility="visible" />
 
     <SeekBar
@@ -131,7 +143,7 @@
         android:id="@+id/textView4"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="远处参照物识别参数调节:" />
+        android:text="远处硬币识别参数调节:" />
 
     <SeekBar
         android:id="@+id/seekBarThresholdMin3"
@@ -142,7 +154,9 @@
     <View
         android:id="@+id/divider"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
+        android:layout_height="1dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
         android:background="?android:attr/listDivider" />
 
     <Button

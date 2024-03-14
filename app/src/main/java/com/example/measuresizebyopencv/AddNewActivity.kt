@@ -29,6 +29,7 @@ import java.math.RoundingMode
 import java.util.*
 import kotlin.math.*
 
+// Thanks to https://github.com/wh173d3v11/OpenCVSamples. It is really helpful as a good start!
 
 enum class ANGLE {
     ANGLE_VERY_SHARP,
@@ -53,6 +54,7 @@ class AddNewActivity : AppCompatActivity() {
     private var backCoinSize: Double = 0.0
     private var backCoinCenter: Point? = null
     private var volume: Double = 2.0
+    private var realCoinSize = 25.0
 
     private lateinit var bluetoothAdapter: BluetoothAdapter
 
@@ -168,7 +170,7 @@ class AddNewActivity : AppCompatActivity() {
     fun onCaptureOrSelectImageClick(view: View) {
         imagePickerResult.launch("image/*")
         val textViewVolume = findViewById<TextView>(R.id.textViewVolume)
-        textViewVolume.text = "Volume:?"
+        textViewVolume.text = "容量:未知"
         volume = 0.0
     }
 
@@ -198,7 +200,6 @@ class AddNewActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     @RequiresApi(Build.VERSION_CODES.P)
     fun onOKToAddClick(view: View) {
-        volume = 2.1
         if (volume == 0.0){
             Toast.makeText(this@AddNewActivity, "Volume is zero", Toast.LENGTH_SHORT).show()
             return
@@ -207,7 +208,7 @@ class AddNewActivity : AppCompatActivity() {
         // To popup dialog for container name
         val builder = AlertDialog.Builder(this)
         val inflater = layoutInflater
-        builder.setTitle("Input Container Name:")
+        builder.setTitle("输入容器名称:")
         val dialogLayout = inflater.inflate(R.layout.alert_dialog_with_edittext, null)
         val editText  = dialogLayout.findViewById<EditText>(R.id.editText)
         builder.setView(dialogLayout)
@@ -218,7 +219,7 @@ class AddNewActivity : AppCompatActivity() {
         val volume_data = decimalFormat.format(volume).toString()
         builder.setPositiveButton("OK") { _, _ ->
             val intent = Intent()
-            data = editText.text.toString() + "(" + volume_data + "L)"
+            data = editText.text.toString() + " " + volume_data + "L"
             intent.putExtra("infor", data)
             setResult(MainmenuActivity.NEW_CONTAINER, intent)
             finish()
@@ -242,15 +243,18 @@ class AddNewActivity : AppCompatActivity() {
         Utils.bitmapToMat(imageBitmap, origMat)
         if (updateContainer) {
             val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin.progress, 0.0, 10.0)
+            Log.v("Threshlod", "Container Threshlod" + minThreshold.toString())
             contourContainer = processContainer(origMat, minThreshold, radioButton.text as String)
         }
         if (updateTopCoin) {
-            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 0.0, 100.0)
+            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin2.progress, 0.0, 50.0)
             processCoin(origMat, minThreshold, topCoin = true)
+            Log.v("Threshlod", "TopCoin Threshlod" + minThreshold.toString())
         }
         if (updateBackCoin) {
-            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin3.progress, 0.0, 40.0)
+            val minThreshold = mapSeekBarProgressToValue(seekbarThresholdMin3.progress, 2.0, 6.0)
             processCoin(origMat, minThreshold, topCoin = false)
+            Log.v("Threshlod","BackCoin Threshlod" + minThreshold.toString())
         }
 
         if ( contourContainer != null) {
@@ -351,7 +355,11 @@ class AddNewActivity : AppCompatActivity() {
             }
         }
 
-        val imageMeter = baseCoinSize / 22.25 // 像素长度/mm
+
+        val heightRatio = baseCoinSize / topCoinSize
+        volume *= heightRatio
+
+        val imageMeter = baseCoinSize / realCoinSize // 像素长度/mm
         volume /= imageMeter.pow(3)
 
         println("Volume: $volume")
@@ -378,7 +386,7 @@ class AddNewActivity : AppCompatActivity() {
     // Process contour:
     // 1. Detect the convex points with bounding box.
     // 2. If it is sharp angle, remove the convex.
-    private fun processContour(contour : MatOfPoint, perimeter: Double, origMat: Mat, toDrawPoly: Boolean, toDrawResult: Boolean): MatOfPoint  {
+    private fun processContour(contour : MatOfPoint, perimeter: Double, origMat: Mat, toDrawPoly: Boolean, toDrawResult: Boolean): Pair<MatOfPoint, Boolean>  {
         val curveList = ArrayList<MatOfPoint>()
         curveList.add(contour)
 
@@ -456,7 +464,8 @@ class AddNewActivity : AppCompatActivity() {
         if (toDrawResult) {
             drawContours(origMat, curveList, 0, Scalar(255.0, 0.0, 0.0), 11)
         }
-        return contour
+        val result :Pair<MatOfPoint, Boolean> = contour to updated
+        return result
     }
 
     private fun showImage(imgMat: Mat)
@@ -540,11 +549,17 @@ class AddNewActivity : AppCompatActivity() {
         approxContour2f.convertTo(contour, CvType.CV_32S)
 
         // Process the contour to remove the sharp part and get the main body
-        val iteration = seekBarIteration.progress + 1
-        repeat( iteration ) {
+        var iteration = 5
+        while (iteration-- > 0){
             Utils.bitmapToMat(imageBitmap, origMat)
-            contour = processContour(contour, perimeter, origMat, toDrawPoly, toDrawResult)
+            val result = processContour(contour, perimeter, origMat, toDrawPoly, toDrawResult)
+            if (result.second)
+            {
+                contour = result.first
+            }
+            else break
         }
+        println("Iteration: $iteration")
         return contour
 
     }
@@ -591,6 +606,8 @@ class AddNewActivity : AppCompatActivity() {
         val hierarchy = Mat()
         findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
 
+
+
         var containerBound: Rect? = null
         if (contourContainer != null) {
             containerBound = boundingRect(contourContainer)
@@ -598,7 +615,7 @@ class AddNewActivity : AppCompatActivity() {
         // find the contours and draw it
         var maxArea = -1.0
         var maxIdx = -1
-        var topY = 100000.0
+        var distance = if (containerBound == null) 1000.0 else containerBound?.width?.times(0.2)  // The back icon shall be close to the container.
         var topIdx = -1
         for ((index, contour) in contours.withIndex()) {
             val contourArea = contourArea(contour)
@@ -628,6 +645,7 @@ class AddNewActivity : AppCompatActivity() {
             }
             //drawContours(origMat, contours, index, Scalar(255.0, 255.0, 0.0), 5)
 
+
             if (topCoin)
             {
                 // Top coin is on the container. Skip if out of container.
@@ -642,15 +660,24 @@ class AddNewActivity : AppCompatActivity() {
                 }
             }
             else{
-                // Back coin is out of the container. Skip if it is in the container.
                 if (containerBound != null) {
+                    // Back coin is out of the container. Skip if it is in the container.
                     if (boundRect.x > containerBound.x && boundRect.x < containerBound.x + containerBound.width
                         && boundRect.y > containerBound.y && boundRect.y < containerBound.y + containerBound.height)
                        continue
-                }
-                if (topY > boundRect.y.toDouble()) {
-                    topY = boundRect.y.toDouble()
-                    topIdx = index
+
+                    // Coin is above the Container.
+                    // If bottom of boundRect is below containerBound.y, skip it.
+                    val bottom = boundRect.y.toDouble() + boundRect.height
+                    if ( bottom > containerBound.y){
+                        continue
+                    }
+
+                    // Find the closest one.
+                    if (containerBound.y - bottom < distance!!) {
+                        distance = containerBound.y - bottom
+                        topIdx = index
+                    }
                 }
             }
 
@@ -661,7 +688,6 @@ class AddNewActivity : AppCompatActivity() {
         if (topIdx < 0 && !topCoin) {
             return
         }
-
         // Find the fit Ellipse
         val contour :MatOfPoint = if (topCoin) contours[maxIdx]  else contours[topIdx]
         //drawContours(origMat, contours, if (topCoin) maxIdx  else topIdx, Scalar(255.0, 255.0, 0.0), 5)
@@ -682,52 +708,4 @@ class AddNewActivity : AppCompatActivity() {
         return
     }
 
-/*
-    // Process the Top Coin
-    private fun processBackCoin(
-        origMat: Mat,
-        minThreshold: Double = 30.0,
-    ) : MatOfPoint? {
-        // Create a Mat object to hold the image data
-        val imageMat = Mat()
-        var tmpMat = Mat()
-
-        // Convert the input imageBitmap to a Mat object (OpenCV format)
-        Utils.bitmapToMat(imageBitmap, imageMat)
-
-        // Convert BGRA to BGR.
-        cvtColor(imageMat, imageMat, COLOR_BGR2GRAY);
-
-        // Blur to filter the noise
-        blur(imageMat, tmpMat, Size(5.0, 5.0))
-
-        // Call Canny for contour detection
-        Canny(tmpMat, imageMat, minThreshold, minThreshold * 3.0, 3, true)
-
-        // Morphological Transformations
-        val kernelMat = getStructuringElement(MORPH_RECT, Size(5.0, 5.0))
-        dilate(imageMat, imageMat, kernelMat, Point(-1.0, -1.0), 2)
-
-        // find contours
-        val contours = ArrayList<MatOfPoint>()
-        val hierarchy = Mat()
-        findContours(imageMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_TC89_KCOS )
-
-        // find the contours and draw it
-        var topY = 100000.0
-        var topIdx = 0
-        for ((index, contour) in contours.withIndex()) {
-            val contourArea = contourArea(contour)
-            if (contourArea < 5000.0 ) {
-                continue
-            }
-            val boundRect: Rect = boundingRect(contour)
-            if (topY > boundRect.y.toDouble()) {
-                topY = boundRect.y.toDouble()
-                topIdx = index
-            }
-            //drawContours(origMat, contours, index, Scalar(0.0, 0.0, 255.0), 15)
-        }
-        return contours[topIdx]
-    }*/
 }

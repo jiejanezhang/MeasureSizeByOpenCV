@@ -44,7 +44,7 @@ class MainmenuActivity : AppCompatActivity() {
         setContentView(R.layout.activity_mainmenu)
         btnAdd = findViewById(R.id.btnAdd)
         btnSave = findViewById(R.id.btnSave)
-        btnAdd.isEnabled = false
+        //btnAdd.isEnabled = false
         btnSave.isEnabled = false
         creatCheckBox()
 
@@ -71,7 +71,7 @@ class MainmenuActivity : AppCompatActivity() {
             // the check box is toggled.
             geekBox.setOnCheckedChangeListener { _, isChecked ->
                 btnSave.isEnabled = true }
-            geekBox.isVisible = false
+            geekBox.visibility = INVISIBLE
             geekBox.id = chkId++
             // Add our created check box to the root
             // layout for it to be displayed
@@ -196,7 +196,7 @@ class MainmenuActivity : AppCompatActivity() {
                 Thread.sleep(100)
                 BTSocket.close()
                 runOnUiThread{
-                    writeCheckBoxes("write", contents)
+                    //writeCheckBoxes("write", contents)
                     Toast.makeText(this@MainmenuActivity, "数据已发送。", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: IOException) {
@@ -293,42 +293,7 @@ class MainmenuActivity : AppCompatActivity() {
 
         }.start()
 
-        /*
-            try {
-                BTSocket.connect()
-                // The connection attempt succeeded. Perform work associated with
-                // the connection.
-                Log.v("BT", "BT connected.")
-                var outputStream = BTSocket.outputStream
-                var inputStream = BTSocket.inputStream
-                var data = "#G"
-                val byteArray = data.toByteArray()
-                outputStream.write(byteArray)
-                Log.v("BT", "Data is sent.")
-                Thread.sleep(100)
 
-                var readBuffer = ByteArray(255) // store for the stream
-                inputStream.read(readBuffer)
-                Thread.sleep(100)
-                var byteBuffer: ByteBuffer = ByteBuffer.wrap(readBuffer)
-                var contents = StandardCharsets.UTF_8.decode(byteBuffer).toString()
-                println("Contents:" + contents)
-                contents = contents.substringBefore('&')
-                println("Clean up contents:" + contents)
-                writeCheckBoxes("write", contents)
-                btnAdd.isEnabled = true
-                //Toast.makeText(this@MainmenuActivity, "Connecting and getting data. Please wait...", Toast.LENGTH_LONG).show()
-                Log.v("BT", "Data is recieved.")
-                BTSocket.close()
-
-                // Read from the InputStream
-            } catch (e: IOException) {
-                Log.e("BT", "Connect or send data error", e)
-                BTSocket.close()
-                Toast.makeText(this@MainmenuActivity, "Connect or send/recieve data error. Please try again.", Toast.LENGTH_SHORT).show()
-            }
-
-        */
     }
 
 }
