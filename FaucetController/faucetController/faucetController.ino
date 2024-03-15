@@ -3,6 +3,20 @@
 #include "FS.h"
 #include "SPIFFS.h"
 #include "string.h"
+#include <Keypad.h>
+
+#include <U8g2lib.h>
+
+#ifdef U8X8_HAVE_HW_SPI
+#include <SPI.h>
+#endif
+#ifdef U8X8_HAVE_HW_I2C
+#include <Wire.h>
+#endif
+
+U8G2_SSD1309_128X64_NONAME0_F_4W_SW_SPI u8g2(U8G2_R0, /* clock=*/ 18, /* data=*/ 23, /* cs=*/ 21, /* dc=*/ 19, /* reset=*/ 2);  
+
+
 
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
@@ -12,12 +26,35 @@
 #error Serial Bluetooth not available or not enabled. It is only available for the ESP32 chip.
 #endif
 
+
+#define BUF_SIZE    128
+
+#define REL_PIN 2 //继电器控制
+
 BluetoothSerial SerialBT;
-//定义继电器控制管脚
-#define relay_pin   25
-#define BUF_SIZE    256
+const byte ROWS =4;    
+const byte COLS =4;
+char keys[ROWS][COLS] ={
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+  };
+byte rowPins[ROWS] = {4, 16,17,5};    //行的接口引脚
+byte colPins[COLS] = {14,27,26,25};  //列的接口引脚
+Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
+unsigned long interval = 0;
+unsigned long triggerMillis =0;
+// Variables will change:
+volatile bool wateringSta = false;  // volatile is asking compiler not to optimize it.
+
+#define MAX_CONTAINER 4
+String buf_container[MAX_CONTAINER];
+u8 container_num = 0;
 char buf[BUF_SIZE];
 char info_file[] = "/containers.txt";
+
+
 
 void readFile(const char file_name[]){
   if (!SPIFFS.exists(file_name)) Serial.println("File does not exist.");
@@ -83,6 +120,57 @@ void sendFile(char file_name[]) {
   }
   file.close();
 }
+
+void loadContainers(const char file_name[]){
+  if (!SPIFFS.exists(file_name)) Serial.println("File does not exist.");
+  File file = SPIFFS.open(file_name, FILE_READ);
+  
+  Serial.println("loadContainers...");
+  // Clear buf_container array
+
+  if (file)
+  {
+    u8 i = 0;
+    while (file.available())
+    {
+      String line = file.readStringUntil('\n');
+      buf_container[i++] = line;
+      Serial.print(line);
+    }
+    container_num = i;
+    for (u8 j=i; j < MAX_CONTAINER ; j++){
+      buf_container[j++] = "";
+    }
+  }
+  file.close();
+}
+
+void showContainerMenu(const char file_name[]){
+
+  loadContainers(file_name);
+  
+  u8g2.enableUTF8Print();		// enable UTF8 support for the Arduino print() function
+  u8g2.setFontDirection(0);
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_unifont_t_container);
+
+  if ( buf_container[0].length() == 0) {
+    u8g2.setCursor(30, 30);    
+    u8g2.print("无容器记录");
+  }
+  else {
+    for (u8 i= 0; i < MAX_CONTAINER; i++){
+      if (buf_container[i].length() == 0) 
+        break;
+      u8g2.setCursor(0, 15*(i+1));
+      String numString = String(i+1);
+      u8g2.print(numString + "." + buf_container[i]);
+      Serial.println("." + buf_container[i] + " is shown.");
+    }
+  }
+  u8g2.sendBuffer();
+}
+
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -93,9 +181,12 @@ void setup() {
   {
     Serial.println("SPIFFS文件系统挂载成功！");
   }
+  //readFile(info_file);
 
-  pinMode(relay_pin, OUTPUT);//设置引脚为输出模式
-  readFile(info_file);
+  u8g2.begin();
+  showContainerMenu(info_file);
+  pinMode(REL_PIN, OUTPUT);
+  digitalWrite(REL_PIN, LOW);
 }
 
 void loop() {
@@ -142,10 +233,44 @@ void loop() {
         }
       }
     }
-    //writeFile(info_file, buf);
-    //readFile(info_file);
+    showContainerMenu(info_file);
   }
-  delay(20);
+
+  
+  char key = keypad.getKey();
+
+  if (key){
+    Serial.println(key);
+    int line_num = atoi(&key);
+    if (line_num <= container_num){
+      String container = buf_container[line_num-1]; // Index is zero based.
+      String volumn = container.substring(container.indexOf(' ')+1, container.length()-1); // remove the last "L"
+      
+      Serial.println(container);
+      Serial.println(volumn);
+      
+      interval = (unsigned long)(volumn.toFloat()*1000/15); // Suppose the watering is 15ml/s
+      Serial.print("interval is set: ");
+      Serial.println(interval, DEC);
+      triggerMillis =  millis();
+      wateringSta = true;
+      digitalWrite(REL_PIN, HIGH);
+    }
+  }
+
+  unsigned long currentMillis = millis();
+  // Serial.println(currentMillis - triggerMillis, DEC);
+  if ((interval != 0) & (currentMillis - triggerMillis >= interval)) {
+    interval = 0;
+    Serial.println("Timeout!!");
+    
+    Serial.print("currentMillis - triggerMillis = ");
+    Serial.println(currentMillis - triggerMillis);
+    wateringSta = false;
+    
+    digitalWrite(REL_PIN, LOW);
+  } 
+  delay(10);
 }
 
 
