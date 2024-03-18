@@ -54,7 +54,7 @@ class AddNewActivity : AppCompatActivity() {
     private var backCoinSize: Double = 0.0
     private var backCoinCenter: Point? = null
     private var volume: Double = 2.0
-    private var realCoinSize = 25.0
+    private var realCoinSize = 30.0
 
     private lateinit var bluetoothAdapter: BluetoothAdapter
 

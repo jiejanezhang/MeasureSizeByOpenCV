@@ -891,3 +891,12 @@ opencv/build/intermediates/cxx/RelWithDebInfo/254b2b2y/meta/x86/symbol_folder_in
 opencv/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
 opencv/build/kotlin/compileDebugKotlin/cacheable/last-build.bin
 opencv/build/kotlin/compileDebugKotlin/local-state/build-history.bin
+FaucetController/simsun.ttc
+FaucetController/u8g2_fonts.c
+FaucetController/u8g2_fonts_many.c
+FaucetController/u8g2_many.h
+FaucetController/Unicode.txt
+FaucetController/字库.txt
+*.log
+/opencv/build
+/opencv/build
