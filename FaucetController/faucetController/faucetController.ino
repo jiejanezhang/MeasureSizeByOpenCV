@@ -194,7 +194,7 @@ void showContainerMenu(const char file_name[]){
   u8g2.sendBuffer();
 }
 
-void showTimeout(unsigned long timeoutMillis){
+void showTiming(unsigned long timeoutMillis){
 
   u8g2.enableUTF8Print();		// enable UTF8 support for the Arduino print() function
   u8g2.setFontDirection(0);
@@ -260,7 +260,7 @@ void loop() {
       showContainerMenu(info_file);
     } 
     else{
-      showTimeout(interval - timeoutMillis);
+      showTiming(interval - timeoutMillis);
       Serial.println(interval - timeoutMillis);
     }
   }

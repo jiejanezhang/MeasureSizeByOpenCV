@@ -324,19 +324,21 @@ class AddNewActivity : AppCompatActivity() {
         for (y in minY..maxY step sliceHeight)
         {
             println("Scan Y: $y")
-            val jointPoints : MutableList<Point> = mutableListOf()
+            val leftPoint = Point(-1.0, y.toDouble())
+            val rightPoint = Point(-1.0, y.toDouble())
             for ( vector in vectorList){
                 if ( y >= vector[0].y && y <= vector[1].y ) {
                     // x = x1 + (y-y1)(x1-x2)/(y1-y2)
                     val x = vector[0].x + (y - vector[0].y)*(vector[0].x - vector[1].x)/(vector[0].y - vector[1].y)
-                    jointPoints.add(Point(x, y.toDouble()))
+                    if ( leftPoint.x < 0 || x < leftPoint.x) leftPoint.x = x
+                    if ( rightPoint.x < 0 || x > rightPoint.x) rightPoint.x = x
                 }
             }
-            if ( jointPoints.size >= 2) {
-                line(origMat, jointPoints[0], jointPoints[1], Scalar(0.0, 0.0, 255.0), 9)
-                println("Joint Points:${jointPoints[0]}, ${jointPoints[1]}")
+            if ( leftPoint.x > 0 && rightPoint.x > 0) {
+                line(origMat, leftPoint, rightPoint, Scalar(0.0, 0.0, 255.0), 9)
+                println("Joint Points:${rightPoint}, ${leftPoint}")
                 // Volume = pi*r²*h
-                volume += sliceHeight * PI * abs(jointPoints[0].x - jointPoints[1].x).pow(2) / 4
+                volume += sliceHeight * PI * abs(rightPoint.x - leftPoint.x).pow(2) / 4
             }
         }
         showImage(origMat)
@@ -395,21 +397,21 @@ class AddNewActivity : AppCompatActivity() {
         // Find the binding box Rect of approx Poly DP
         val boundRect: Rect = boundingRect(contour)
         println("Bounding Box tl: [${boundRect.tl().x} ${boundRect.tl().y}]   br: [${boundRect.br().x} ${boundRect.br().y}]")
-
+        //rectangle(origMat, boundRect, Scalar(255.0, 0.0, 255.0),11)
         // Judge the bounding points
         val pointList = contour.toList()
         var newPointList: MutableList<Point> = mutableListOf()
         var updated = false
         for ( (index, point) in pointList.withIndex()) {
-            println("$index: [${point.x}0.2 ${point.y}]")
+            println("$index: [${point.x}, ${point.y}]")
             var textPoint = Point(point.x-10, point.y+20)
             putText(origMat,index.toString(), textPoint, FONT_HERSHEY_PLAIN, 10.0, Scalar(255.0, 255.0, 0.0), 11)
 
             // Check if the point is in bounding box
-            if (point.x in boundRect.tl().x - 2 .. boundRect.tl().x + 2 ||
-                point.x in boundRect.br().x - 2 .. boundRect.br().x + 2 ||
-                point.y in boundRect.tl().y - 2 .. boundRect.tl().y + 2 ||
-                point.y in boundRect.br().y - 2 .. boundRect.br().y + 2 )
+            if (point.x in boundRect.tl().x - 5 .. boundRect.tl().x + 5 ||
+                point.x in boundRect.br().x - 5 .. boundRect.br().x + 5 ||
+                point.y in boundRect.tl().y - 5 .. boundRect.tl().y + 5 ||
+                point.y in boundRect.br().y - 5 .. boundRect.br().y + 5 )
             {
                 println("Point is in bounding box")
                 val preIndex = if (index == 0)  pointList.size - 1 else index - 1
@@ -430,8 +432,8 @@ class AddNewActivity : AppCompatActivity() {
                         println("ANGLE_BARELY_SHARP")
                         val b = sqrt(distSquare(point, prePoint))
                         val c = sqrt(distSquare(point, nextPoint))
-                        if (b > 0.07 * perimeter ||
-                            c > 0.07 * perimeter )
+                        if (b > 0.10* perimeter ||
+                            c > 0.10 * perimeter )
                         {
                             println("Corner point. Keep this point.")
                             newPointList.add(point)
@@ -536,7 +538,7 @@ class AddNewActivity : AppCompatActivity() {
                 toDrawPoly = true
             }
         }
-        drawContours(origMat, contours, maxIdx, Scalar(255.0, 0.0, 0.0), 15)
+        //drawContours(origMat, contours, maxIdx, Scalar(255.0, 0.0, 0.0), 15)
 
         // approximate a contour shape
         var contour = contours[maxIdx]
